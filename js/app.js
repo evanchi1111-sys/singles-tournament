@@ -117,7 +117,9 @@ function divisionView(div) {
       v.superRows = standings(qualIds, [...carried, ...resultsFrom(v.finalRes)], (id) => playerById(id)?.draw_final ?? null);
       v.carried = carried;
       v.superDone = [...v.finalRes.values()].every((r) => ['done', 'bye'].includes(r.state));
-      v.placings = v.superDone ? v.superRows.map((r) => ({ place: r.rank, id: r.id })) : [];
+      // 還有「需抽籤但還沒抽」的同分時，名次未定，先不公布名次
+      v.superAwaitingDraw = v.superDone && v.superRows.some((r) => r.drawTied && r.draw == null);
+      v.placings = v.superDone && !v.superAwaitingDraw ? v.superRows.map((r) => ({ place: r.rank, id: r.id })) : [];
     } else {
       v.size = nextPow2(final.filter((m) => /^W1-/.test(m.code)).length * 2);
       v.placings = knockoutPlacings(v.finalRes, 'single');
@@ -289,6 +291,9 @@ function standingsTable(rows, { qualify = 0, admin = false, drawField, complete 
 }
 
 function placingsCard(v) {
+  if (v.superAwaitingDraw) {
+    return `<section class="card placings"><h3>🏆 ${DIVISIONS[v.div]} 名次</h3><p class="note">總決賽已全部打完，但有選手戰績完全相同，等待主辦單位抽籤後公布最終名次。</p></section>`;
+  }
   if (!v.placings?.length) return '';
   const medal = ['', '🥇', '🥈', '🥉', '4️⃣'];
   return `
