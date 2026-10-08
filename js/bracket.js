@@ -385,6 +385,13 @@ export function knockoutPlacings(resolved, format) {
     if (f) { add(1, f.winner); add(2, f.loser); }
     const t = finalOf(get('T'));
     if (t) { add(3, t.winner); add(4, t.loser); }
+    // 沒有季軍賽時，兩位準決賽敗者並列第 3 名
+    if (!get('T') && rounds >= 2) {
+      for (const i of [0, 1]) {
+        const semi = finalOf(get(`W${rounds - 1}-${i}`));
+        if (semi && semi.loser) add(3, semi.loser);
+      }
+    }
   }
   return out;
 }

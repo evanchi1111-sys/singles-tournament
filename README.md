@@ -7,7 +7,7 @@
 |---|---|
 | **單淘汰賽** | 輸一場即淘汰；種子選手分在不同半區、優先輪空；加打**季軍賽** |
 | **雙淘汰賽** | 輸兩場才淘汰（勝部／敗部）；敗部安排避免太早重複對戰；**冠軍戰一場定勝負** |
-| **分組循環賽** | 依種子**蛇形分組**、組內單循環，每組前 N 名（主辦自訂）進入總決賽。總決賽由主辦選擇：<br>・**單淘汰賽**：各組第 1 名為前段種子；同組第 1、2 名分在不同半區，同組選手盡量越晚相遇（不會在第一輪碰頭）；加打季軍賽<br>・**超級循環賽**：預賽同組不再重打，**帶入預賽成績**，只打不同組之間的對戰 |
+| **分組循環賽** | 依種子**蛇形分組**、組內單循環，每組前 N 名（主辦自訂）進入總決賽。總決賽由主辦選擇（另可設總決賽每場局數、是否加打冠軍賽／季軍賽）：<br>・**單淘汰賽**：各組第 1 名為前段種子；同組第 1、2 名分在不同半區，同組選手盡量越晚相遇（不會在第一輪碰頭）；可選擇是否加打季軍賽（不打則準決賽敗者並列第 3 名）<br>・**超級循環賽**：預賽同組不再重打，**帶入預賽成績**，只打不同組之間的對戰；可選擇循環賽後加打**冠軍賽**（第 1 vs 第 2 名）、**季軍賽**（第 3 vs 第 4 名） |
 
 - 每局記錄實際分數；每場可設三局兩勝、五局三勝或七局四勝
 - 循環賽名次：勝場數 → 兩人同勝看對戰勝負 → 三人以上只計彼此對戰，依序比 場數、局數、分數勝率（剩兩人時看對戰勝負）→ 抽籤
@@ -21,7 +21,7 @@
 
 ## 設定
 可與雙打計分、團體賽排點系統共用同一個 Supabase 專案（本系統資料表以 `sg_` 開頭）。
-1. **SQL Editor** → **New query** → 貼上 [`supabase/setup.sql`](supabase/setup.sql) → **Run**。（2026-10-08 以前建立的專案，另外執行一次 [`supabase/upgrade-01-final-best-of.sql`](supabase/upgrade-01-final-best-of.sql)）
+1. **SQL Editor** → **New query** → 貼上 [`supabase/setup.sql`](supabase/setup.sql) → **Run**。（2026-10-08 以前建立的專案，另外執行一次 [`supabase/upgrade-01-final-best-of.sql`](supabase/upgrade-01-final-best-of.sql)、[`upgrade-02-playoffs.sql`](supabase/upgrade-02-playoffs.sql)）
 2. 主辦帳號：**Authentication** → **Users** 需有 `organizer@dsc-table-tennis.app`（與 `setup.sql` 第 4 段、`js/config.js` 一致）。
 3. [`js/config.js`](js/config.js) 填入 Project URL 與 publishable（anon）key。
 4. 倉庫 **Settings** → **Pages** → Branch `main`、`/ (root)`。

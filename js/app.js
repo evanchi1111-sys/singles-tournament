@@ -45,6 +45,12 @@ const playersOf = (div) => state.players.filter((p) => p.division === div).sort(
 const matchesOf = (div, stage) => state.matches.filter((m) => m.division === div && m.stage === stage);
 // 每場局數：總決賽可另外設定，沒設定就跟預賽相同
 const bestOfFor = (cfg, stage) => (stage === 'final' && cfg.final_best_of ? cfg.final_best_of : cfg.best_of);
+// 總決賽加打哪些場次：超級循環可加打冠軍賽、季軍賽；單淘汰的決賽本身就是冠軍賽，只能選季軍賽
+const finalOptions = (cfg) => ({
+  champ: cfg.final_format === 'super' && !!cfg.final_champion,
+  third: cfg.final_third ?? cfg.final_format === 'single',
+});
+const PLAYOFF_LABEL = { PF: '冠軍賽', PT: '季軍賽' };
 
 let toastTimer;
 function toast(message, kind = 'info') {
@@ -123,15 +129,38 @@ function divisionView(div) {
   if (final.length) {
     v.finalRes = resolveStage(final, bestOfFor(cfg, 'final'));
     if (cfg.final_format === 'super') {
-      const qualIds = [...new Set(final.flatMap((m) => [m.src1.seed, m.src2.seed]))];
-      // 晉級者之間：同組的預賽成績＋總決賽的新對戰
+      v.superMatches = final.filter((m) => /^S-/.test(m.code));
+      v.playoffs = final.filter((m) => PLAYOFF_LABEL[m.code]);
+      const qualIds = [...new Set(v.superMatches.flatMap((m) => [m.src1.seed, m.src2.seed]))];
+      // 晉級者之間：同組的預賽成績＋超級循環的新對戰（冠軍賽、季軍賽不算進循環賽排名）
       const carried = resultsFrom(v.groupRes).filter((r) => qualIds.includes(r.a) && qualIds.includes(r.b));
-      v.superRows = standings(qualIds, [...carried, ...resultsFrom(v.finalRes)], (id) => playerById(id)?.draw_final ?? null);
+      const superResults = resultsFrom(new Map([...v.finalRes].filter(([code]) => /^S-/.test(code))));
+      v.superRows = standings(qualIds, [...carried, ...superResults], (id) => playerById(id)?.draw_final ?? null);
       v.carried = carried;
-      v.superDone = [...v.finalRes.values()].every((r) => ['done', 'bye'].includes(r.state));
-      // 還有「需抽籤但還沒抽」的同分時，名次未定，先不公布名次
-      v.superAwaitingDraw = v.superDone && v.superRows.some((r) => r.drawTied && r.draw == null);
-      v.placings = v.superDone && !v.superAwaitingDraw ? v.superRows.map((r) => ({ place: r.rank, id: r.id })) : [];
+      v.superDone = v.superMatches.every((m) => ['done', 'bye'].includes(v.finalRes.get(m.code).state));
+      // 要加打的場次（人數不足時自動不打：冠軍賽需 2 人、季軍賽需 4 人）
+      const opt = finalOptions(cfg);
+      v.plan = { champ: opt.champ && qualIds.length >= 2, third: opt.third && qualIds.length >= 4 };
+      v.hasPlayoffs = v.plan.champ || v.plan.third;
+      // 同分是否需要抽籤：若同分的人剛好是冠軍賽（第1、2名）或季軍賽（第3、4名）的雙方，比賽會分出高下，不必抽
+      const inBlock = (ranks) => (v.plan.champ && ranks.every((r) => r <= 2)) || (v.plan.third && ranks.every((r) => r >= 3 && r <= 4));
+      const clusters = new Map();
+      for (const r of v.superRows) if (r.drawTied) clusters.set(r.tieGroup, [...(clusters.get(r.tieGroup) || []), r]);
+      v.superDrawNeeded = [...clusters.values()].filter((c) => c.some((r) => r.draw == null) && !inBlock(c.map((r) => r.rank)));
+      v.superAwaitingDraw = v.superDone && v.superDrawNeeded.length > 0;
+      v.canMakePlayoffs = v.hasPlayoffs && v.superDone && !v.superAwaitingDraw && !v.playoffs.length;
+      const playoffDone = v.playoffs.length > 0 && v.playoffs.every((m) => v.finalRes.get(m.code).state === 'done');
+      if (!v.superDone || v.superAwaitingDraw || (v.hasPlayoffs && !playoffDone)) {
+        v.placings = [];
+      } else {
+        // 循環賽名次為基礎，冠軍賽決定第 1、2 名，季軍賽決定第 3、4 名
+        const placeOf = new Map(v.superRows.map((r) => [r.id, r.rank]));
+        const pf = v.finalRes.get('PF');
+        const pt = v.finalRes.get('PT');
+        if (pf) { placeOf.set(pf.winner, 1); placeOf.set(pf.loser, 2); }
+        if (pt) { placeOf.set(pt.winner, 3); placeOf.set(pt.loser, 4); }
+        v.placings = [...placeOf].map(([id, place]) => ({ place, id })).sort((a, b) => a.place - b.place);
+      }
     } else {
       v.size = nextPow2(final.filter((m) => /^W1-/.test(m.code)).length * 2);
       v.placings = knockoutPlacings(v.finalRes, 'single');
@@ -304,7 +333,10 @@ function standingsTable(rows, { qualify = 0, admin = false, drawField, complete 
 
 function placingsCard(v) {
   if (v.superAwaitingDraw) {
-    return `<section class="card placings"><h3>🏆 ${DIVISIONS[v.div]} 名次</h3><p class="note">總決賽已全部打完，但有選手戰績完全相同，等待主辦單位抽籤後公布最終名次。</p></section>`;
+    return `<section class="card placings"><h3>🏆 ${DIVISIONS[v.div]} 名次</h3><p class="note">超級循環賽已全部打完，但有選手戰績完全相同，等待主辦單位抽籤後${v.hasPlayoffs ? '安排冠軍賽／季軍賽' : '公布最終名次'}。</p></section>`;
+  }
+  if (v.hasPlayoffs && v.superDone && !v.placings?.length) {
+    return `<section class="card placings"><h3>🏆 ${DIVISIONS[v.div]} 名次</h3><p class="note">超級循環賽已結束，${[v.plan.champ && '冠軍賽', v.plan.third && '季軍賽'].filter(Boolean).join('、')}打完後公布最終名次。</p></section>`;
   }
   if (!v.placings?.length) return '';
   const medal = ['', '🥇', '🥈', '🥉', '4️⃣'];
@@ -320,9 +352,34 @@ function formatSummary(v) {
   const base = `${FORMATS[c.format]}・每場${BEST_OF[c.best_of]}`;
   if (c.format !== 'groups') return base + (c.format === 'single' ? '・加打季軍賽' : '・冠軍戰一場定勝負');
   const finalBo = bestOfFor(c, 'final');
-  const finalText = finalBo !== c.best_of ? `，總決賽每場${BEST_OF[finalBo]}` : '';
-  return `${base}・分 ${c.group_count} 組，每組取前 ${c.advance_count} 名進入總決賽（${FINAL_FORMATS[c.final_format]}${finalText}）`;
+  const opt = finalOptions(c);
+  const extras = c.final_format === 'super'
+    ? [opt.champ && '加打冠軍賽', opt.third && '加打季軍賽'].filter(Boolean).join('、')
+    : opt.third ? '加打季軍賽' : '不打季軍賽';
+  const finalText = [finalBo !== c.best_of && `總決賽每場${BEST_OF[finalBo]}`, extras].filter(Boolean).join('，');
+  return `${base}・分 ${c.group_count} 組，每組取前 ${c.advance_count} 名進入總決賽（${FINAL_FORMATS[c.final_format]}${finalText ? `，${finalText}` : ''}）`;
 }
+
+// 總決賽加打冠軍賽／季軍賽的選單
+const finalExtrasSelects = (c) => {
+  const opt = finalOptions(c);
+  if (c.final_format === 'super') {
+    return `
+      <label>冠軍賽<select data-change="div-setting" data-field="final_champion">
+        <option value="false" ${!opt.champ ? 'selected' : ''}>不加打（依循環賽名次）</option>
+        <option value="true" ${opt.champ ? 'selected' : ''}>加打（第 1 名 vs 第 2 名）</option>
+      </select></label>
+      <label>季軍賽<select data-change="div-setting" data-field="final_third">
+        <option value="false" ${!opt.third ? 'selected' : ''}>不加打（依循環賽名次）</option>
+        <option value="true" ${opt.third ? 'selected' : ''}>加打（第 3 名 vs 第 4 名）</option>
+      </select></label>`;
+  }
+  return `
+    <label>季軍賽<select data-change="div-setting" data-field="final_third">
+      <option value="true" ${opt.third ? 'selected' : ''}>加打季軍賽</option>
+      <option value="false" ${!opt.third ? 'selected' : ''}>不打，準決賽敗者並列第 3 名</option>
+    </select></label>`;
+};
 
 // 總決賽每場局數的選單（空白 = 與預賽相同）
 const finalBestOfSelect = (c) => `
@@ -388,8 +445,12 @@ function rulesCard(v) {
         <li><b>預賽分組：</b>依種子順序<b>蛇形</b>分成 ${c.group_count} 組（1 號種子在 A 組、2 號在 B 組…，下一輪反過來排），讓各組實力平均。</li>
         <li><b>預賽：</b>組內單循環，每場${bo('group')}，每組前 <b>${c.advance_count}</b> 名晉級總決賽。</li>
         <li><b>總決賽：</b>每場${bo('final')}。${c.final_format === 'super'
-          ? '晉級選手打<b>超級循環賽</b>：預賽<b>同組</b>的選手<b>不再重打</b>，直接帶入預賽兩人之間的對戰成績；只打<b>不同組</b>之間的比賽，依下方循環賽名次規則排出最終名次。'
-          : '晉級選手進行<b>單淘汰賽</b>：各組第 1 名為前段種子、優先輪空；<b>同組第 1、2 名分在不同半區</b>，最快在決賽（或季軍賽）才會再遇到；同組其他晉級選手也盡量安排越晚相遇，不會在第一輪碰頭。準決賽兩位敗者加打<b>季軍賽</b>。'}</li>
+          ? `晉級選手打<b>超級循環賽</b>：預賽<b>同組</b>的選手<b>不再重打</b>，直接帶入預賽兩人之間的對戰成績；只打<b>不同組</b>之間的比賽，依下方循環賽名次規則排名。${
+              finalOptions(c).champ || finalOptions(c).third
+                ? `循環賽結束後，${[finalOptions(c).champ && '第 1、2 名加打<b>冠軍賽</b>，勝者為冠軍、敗者為亞軍', finalOptions(c).third && '第 3、4 名加打<b>季軍賽</b>，勝者第 3 名、敗者第 4 名'].filter(Boolean).join('；')}；其餘名次依循環賽排名。`
+                : '最終名次即為循環賽排名。'}`
+          : `晉級選手進行<b>單淘汰賽</b>：各組第 1 名為前段種子、優先輪空；<b>同組第 1、2 名分在不同半區</b>，最快在決賽${finalOptions(c).third ? '（或季軍賽）' : ''}才會再遇到；同組其他晉級選手也盡量安排越晚相遇，不會在第一輪碰頭。決賽勝者為冠軍、敗者為亞軍；${
+              finalOptions(c).third ? '準決賽兩位敗者加打<b>季軍賽</b>，勝者第 3 名、敗者第 4 名。' : '不打季軍賽，準決賽兩位敗者<b>並列第 3 名</b>。'}`}</li>
       </ol>
       <p><b>循環賽名次判定</b>（預賽各組${c.final_format === 'super' ? '、超級循環賽' : ''}適用）：</p>
       ${tie}
@@ -439,14 +500,23 @@ function renderCompetition(v, { admin }) {
           <div class="match-list">${g.matches.sort((a, b) => a.round - b.round || a.idx - b.idx).map((m) => matchBox(v.groupRes.get(m.code), { label: `第 ${m.round} 輪`, admin, stage: 'group' })).join('')}</div>
         </section>`).join('');
     } else if (v.cfg.final_format === 'super') {
+      // 會由冠軍賽／季軍賽分出高下的同分，不需要抽籤
+      const needDraw = new Set(v.superDrawNeeded.flat().map((r) => r.id));
+      const rows = v.superRows.map((r) => (r.drawTied && !needDraw.has(r.id)
+        ? { ...r, drawTied: false, basis: `戰績相同（由${r.rank <= 2 ? '冠軍賽' : '季軍賽'}決定）` } : r));
+      const playoffBoxes = v.playoffs.length
+        ? `<h3 class="section-title">冠軍賽與季軍賽</h3>
+           <div class="match-list">${['PF', 'PT'].filter((c) => v.finalRes.get(c)).map((c) => matchBox(v.finalRes.get(c), { label: c === 'PF' ? '冠軍賽（循環賽第 1 名 vs 第 2 名）' : '季軍賽（循環賽第 3 名 vs 第 4 名）', admin, stage: 'final' })).join('')}</div>`
+        : v.hasPlayoffs ? `<p class="note">循環賽打完後，${[v.plan.champ && '第 1、2 名加打<b>冠軍賽</b>', v.plan.third && '第 3、4 名加打<b>季軍賽</b>'].filter(Boolean).join('；')}。</p>` : '';
       body = tabs + `
         <section class="card">
           <h3>總決賽（超級循環賽）排名</h3>
-          ${standingsTable(v.superRows, { admin, drawField: 'draw_final', complete: v.superDone })}
+          ${standingsTable(rows, { admin, drawField: 'draw_final', complete: v.superDone })}
           <p class="note">預賽同組選手不再重打，已帶入預賽的 ${v.carried.length} 場對戰成績。</p>
+          ${playoffBoxes}
         </section>
-        <h3 class="section-title">總決賽對戰</h3>
-        <div class="match-list">${v.final.sort((a, b) => a.round - b.round || a.idx - b.idx).map((m) => matchBox(v.finalRes.get(m.code), { label: `第 ${m.round} 輪`, admin, stage: 'final' })).join('')}</div>`;
+        <h3 class="section-title">超級循環賽對戰</h3>
+        <div class="match-list">${v.superMatches.sort((a, b) => a.round - b.round || a.idx - b.idx).map((m) => matchBox(v.finalRes.get(m.code), { label: `第 ${m.round} 輪`, admin, stage: 'final' })).join('')}</div>`;
     } else {
       body = tabs + renderKnockout(v.finalRes, v.size, 'single', { admin, stage: 'final' });
     }
@@ -509,7 +579,8 @@ function renderSetup(v) {
           <label>總決賽<select data-change="div-setting" data-field="final_format">
             ${Object.entries(FINAL_FORMATS).map(([k, l]) => `<option value="${k}" ${c.final_format === k ? 'selected' : ''}>${l}</option>`).join('')}
           </select></label>
-          ${finalBestOfSelect(c)}` : ''}
+          ${finalBestOfSelect(c)}
+          ${finalExtrasSelects(c)}` : ''}
       </div>
       ${groupInfo}
       <p class="note">${{ single: '單淘汰：輸一場即淘汰，加打季軍賽。', double: '雙淘汰：輸兩場才淘汰，冠軍戰一場定勝負（至少 3 人）。', groups: '分組循環：依種子蛇形分組，組內單循環，各組前幾名進入總決賽。' }[c.format]}</p>
@@ -556,6 +627,11 @@ function renderAdmin() {
   if (v.phase === 'group') {
     actions.push(`<button class="btn primary" data-action="make-final" ${busy || !v.groupsDone ? 'disabled' : ''}>產生總決賽（${FINAL_FORMATS[v.cfg.final_format]}）</button>`);
   }
+  if (v.phase === 'final' && v.hasPlayoffs) {
+    const names = [v.plan.champ && '冠軍賽', v.plan.third && '季軍賽'].filter(Boolean).join('／');
+    if (!v.playoffs.length) actions.push(`<button class="btn primary" data-action="make-playoffs" ${busy || !v.canMakePlayoffs ? 'disabled' : ''}>產生${names}</button>`);
+    else actions.push(`<button class="btn" data-action="cancel-playoffs" ${busy}>取消${names}</button>`);
+  }
   if (v.phase === 'final') actions.push(`<button class="btn" data-action="reset-final" ${busy}>取消總決賽，回到預賽</button>`);
   if (v.phase !== 'setup') actions.push(`<button class="btn danger" data-action="reset" ${busy}>重設本組賽程</button>`);
   const minGroup = v.groups ? Math.min(...v.groups.map((g) => g.ids.length)) : 0;
@@ -569,11 +645,15 @@ function renderAdmin() {
         ${Object.entries(FINAL_FORMATS).map(([k, l]) => `<option value="${k}" ${v.cfg.final_format === k ? 'selected' : ''}>${l}</option>`).join('')}
       </select></label>
       ${finalBestOfSelect(v.cfg)}
+      ${finalExtrasSelects(v.cfg)}
     </div>` : '';
   const groupHint = v.phase === 'group'
     ? (!v.groupsDone ? '<p class="note">預賽全部打完後，才能產生總決賽。產生前仍可調整晉級人數與總決賽賽制。</p>'
       : v.unresolved.length ? `<p class="banner warn">${v.unresolved.join('、')} 組有戰績完全相同的選手${v.cfg.final_format === 'single' ? '，會影響晉級或總決賽的種子位置' : '，會影響誰晉級'}，請先在該組排名表填入抽籤順位。</p>` : '')
-    : '';
+    : v.phase === 'final' && v.hasPlayoffs && !v.playoffs.length
+      ? (!v.superDone ? '<p class="note">超級循環賽全部打完後，才能產生冠軍賽／季軍賽。</p>'
+        : v.superAwaitingDraw ? '<p class="banner warn">有戰績完全相同的選手會影響冠軍賽／季軍賽的人選，請先在排名表填入抽籤順位。</p>' : '')
+      : '';
   return `
     ${renderDivisionTabs()}
     ${v.phase === 'setup' ? renderSetup(v) : `
@@ -646,7 +726,8 @@ function openScoreModal(div, stage, code) {
   const n2 = nameOf(info.p2);
   const saved = info.stale ? [] : info.match.games;
   const cell = (i, side) => `<input class="pt-input" type="number" inputmode="numeric" min="0" max="99" data-game="${i}" data-side="${side}" value="${saved[i] ? saved[i][side] : ''}" aria-label="第 ${i + 1} 局 ${esc(side ? n2 : n1)} 得分">`;
-  const label = info.match.grp ? `${info.match.grp} 組 第 ${info.match.round} 輪` : /^S-/.test(code) ? '總決賽' : roundLabel(code, stage === 'main' ? v.size : v.size);
+  const label = info.match.grp ? `${info.match.grp} 組 第 ${info.match.round} 輪`
+    : /^S-/.test(code) ? '超級循環賽' : PLAYOFF_LABEL[code] || roundLabel(code, v.size);
 
   openModal(
     `<h2>${esc(label)}</h2>
@@ -720,6 +801,11 @@ function openScoreModal(div, stage, code) {
         // 勝負改變時，若後續對戰已經有比分，要先清除後續比分（避免名次錯亂）
         const oldWinner = info.state === 'done' ? info.winner : null;
         const newWinner = ev.decided ? (ev.w1 > ev.w2 ? info.p1 : info.p2) : null;
+        // 冠軍賽／季軍賽是依循環賽名次產生的，產生後循環賽比分不能再改（勝負或局數都會影響名次）
+        if (/^S-/.test(code) && v.playoffs?.length && JSON.stringify(ev.games) !== JSON.stringify(info.match.games)) {
+          modal.querySelector('.score-result').innerHTML = '<span class="error">已依循環賽名次產生冠軍賽／季軍賽。若要修改循環賽比分，請先在上方按「取消冠軍賽／季軍賽」。</span>';
+          return;
+        }
         if (oldWinner !== newWinner) {
           const blocked = dependentsOf(stageMatches, code).filter((m) => (m.games || []).length);
           if (blocked.length) {
@@ -811,7 +897,7 @@ function makeFinal() {
   if (v.cfg.final_format === 'super') {
     rows = buildSuper(knockoutSeeds(groupRanks, k).map((id) => qualifiers.find((q) => q.id === id)));
   } else {
-    rows = buildSingle(knockoutSeeds(groupRanks, k), 'final');
+    rows = buildSingle(knockoutSeeds(groupRanks, k), 'final', { thirdPlace: finalOptions(v.cfg).third });
   }
   const list = groupRanks.map((g) => `${g.grp} 組：${g.ids.map(nameOf).join('、')}`).join('\n');
   if (!confirm(`晉級總決賽（${FINAL_FORMATS[v.cfg.final_format]}）：\n${list}\n\n確定產生總決賽？`)) return;
@@ -856,6 +942,22 @@ const actions = {
   },
   generate,
   'make-final': makeFinal,
+  'make-playoffs': () => {
+    const v = divisionView(state.division);
+    if (!v.canMakePlayoffs) return;
+    const r = v.superRows;
+    const rows = [];
+    if (v.plan.champ) rows.push({ stage: 'final', code: 'PF', round: 1, idx: 0, src1: { seed: r[0].id }, src2: { seed: r[1].id } });
+    if (v.plan.third) rows.push({ stage: 'final', code: 'PT', round: 1, idx: 1, src1: { seed: r[2].id }, src2: { seed: r[3].id } });
+    const text = rows.map((m) => `${PLAYOFF_LABEL[m.code]}：${nameOf(m.src1.seed)} vs ${nameOf(m.src2.seed)}`).join('\n');
+    if (!confirm(`依超級循環賽名次產生：\n${text}\n\n產生後若要修改循環賽比分，需先取消冠軍賽／季軍賽。`)) return;
+    run(() => backend.createMatches(rows.map((m) => ({ ...m, division: v.div, grp: null }))), '已產生');
+  },
+  'cancel-playoffs': () => {
+    const v = divisionView(state.division);
+    if (!confirm('取消冠軍賽／季軍賽會刪除這些比賽與比分。確定嗎？')) return;
+    run(() => backend.deleteMatchIds(v.playoffs.map((m) => m.id)), '已取消');
+  },
   'reset-final': () => {
     if (!confirm('取消總決賽會刪除總決賽的所有對戰與比分，回到預賽。確定嗎？')) return;
     run(async () => {
@@ -905,7 +1007,7 @@ function exportCtx() {
       };
       push(v.res, FORMATS[v.cfg.format], (m) => roundLabel(m.code, v.size));
       push(v.groupRes, '預賽', (m) => `${m.grp} 組 第 ${m.round} 輪`);
-      push(v.finalRes, '總決賽', (m) => (/^S-/.test(m.code) ? `第 ${m.round} 輪` : roundLabel(m.code, v.size)));
+      push(v.finalRes, '總決賽', (m) => (/^S-/.test(m.code) ? `第 ${m.round} 輪` : PLAYOFF_LABEL[m.code] || roundLabel(m.code, v.size)));
       return {
         label: DIVISIONS[div],
         formatLabel: formatSummary(v),
@@ -935,7 +1037,8 @@ app.addEventListener('change', (e) => {
     const field = el.dataset.field;
     const value = field === 'final_best_of'
       ? (el.value ? Number(el.value) : null)
-      : ['best_of', 'group_count', 'advance_count'].includes(field) ? Number(el.value) : el.value;
+      : ['final_champion', 'final_third'].includes(field) ? el.value === 'true'
+        : ['best_of', 'group_count', 'advance_count'].includes(field) ? Number(el.value) : el.value;
     if (field === 'group_count' && !(value >= 2 && value <= 32)) return toast('組數需為 2～32', 'error');
     if (field === 'advance_count' && !(value >= 1 && value <= 8)) return toast('晉級人數需為 1～8', 'error');
     el.blur();

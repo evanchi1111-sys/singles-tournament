@@ -1,6 +1,10 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ORGANIZER_EMAIL } from './config.js';
 
-export const DEFAULT_DIVISION = { format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null };
+export const DEFAULT_DIVISION = {
+  format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null,
+  final_champion: false, // 超級循環賽後加打冠軍賽（第 1 名對第 2 名）
+  final_third: null,     // 加打季軍賽；null = 依總決賽賽制預設（單淘汰打、超級循環不打）
+};
 
 export function isConfigured() {
   return /^https:\/\/.+/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
@@ -115,6 +119,9 @@ async function createSupabaseBackend() {
       await this.updateDivision(division, {}); // 先確認有主辦權限
       check(await sb.from('sg_matches').delete().eq('division', division).in('stage', stages));
     },
+    async deleteMatchIds(ids) {
+      if (ids.length) mustAffect(await sb.from('sg_matches').delete().in('id', ids).select());
+    },
     async wipe() {
       await this.updateSettings({});
       check(await sb.from('sg_matches').delete().not('id', 'is', null));
@@ -194,6 +201,7 @@ function createDemoBackend() {
       db.matches = db.matches.filter((m) => !(m.division === division && stages.includes(m.stage)));
       emit();
     },
+    async deleteMatchIds(ids) { requireOrganizer(); db.matches = db.matches.filter((m) => !ids.includes(m.id)); emit(); },
     async wipe() { requireOrganizer(); db.matches = []; db.players = []; emit(); },
   };
 }

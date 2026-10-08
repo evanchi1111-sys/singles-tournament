@@ -26,6 +26,9 @@ create table if not exists public.sg_divisions (
   updated_at    timestamptz not null default now()
 );
 alter table public.sg_divisions add column if not exists final_best_of int check (final_best_of in (3, 5, 7));
+-- 總決賽加打：超級循環賽後的冠軍賽（第 1 名對第 2 名）、季軍賽（null = 依賽制預設：單淘汰打、超級循環不打）
+alter table public.sg_divisions add column if not exists final_champion boolean not null default false;
+alter table public.sg_divisions add column if not exists final_third boolean;
 insert into public.sg_divisions (id) values ('competitive'), ('fun') on conflict (id) do nothing;
 
 create table if not exists public.sg_players (
