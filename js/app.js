@@ -327,29 +327,64 @@ function myBanner(v) {
   return '';
 }
 
+// 給選手看的賽制與名次規則（內容依主辦設定自動調整）
 function rulesCard(v) {
   const c = v.cfg;
+  const bo = (stage) => BEST_OF[bestOfFor(c, stage)];
+  const knockoutBasics = `
+    <li><b>種子與輪空：</b>人數不是 2 的次方（4、8、16…）時會有輪空，輪空優先給前段種子，直接晉級下一輪。1、2 號種子分在不同半區，最快在決賽才會相遇。</li>`;
   const tie = `
     <ol class="rule-steps">
       <li><b>勝場數</b>多者，名次在前。</li>
-      <li><b>兩人勝場數相同：</b>看兩人之間比賽的勝負。</li>
-      <li><b>三人以上勝場數相同：</b>只計算這幾位<u>彼此之間</u>的比賽，依序比 <b>場數勝率</b>（勝場 ÷ 敗場）→ <b>局數勝率</b>（勝局 ÷ 敗局）→ <b>分數勝率</b>（得分 ÷ 失分）；比較過程中若只剩兩人相同，改看兩人之間比賽的勝負。</li>
+      <li><b>兩人勝場數相同：</b>看這兩人之間比賽的勝負，勝者在前。</li>
+      <li><b>三人以上勝場數相同（互咬）：</b>只計算這幾位<u>彼此之間</u>的比賽，依序比：
+        <ol class="rule-sub">
+          <li><b>場數勝率</b>＝勝場數 ÷ 敗場數</li>
+          <li><b>局數勝率</b>＝勝局數 ÷ 敗局數</li>
+          <li><b>分數勝率</b>＝總得分 ÷ 總失分</li>
+        </ol>
+        比較過程中，若只剩<b>兩人</b>數據相同，改看這兩人之間比賽的勝負。</li>
       <li><b>以上全部相同：</b>由主辦單位抽籤決定。</li>
-    </ol>`;
-  const body = {
-    single: `<p>輸一場即淘汰，種子選手分在不同半區、優先輪空。準決賽的兩位敗者再打<b>季軍賽</b>決定第 3、4 名。</p>`,
-    double: `<p>每位選手要輸<b>兩場</b>才淘汰：第一次輸掉後掉到<b>敗部</b>繼續比賽。勝部冠軍與敗部冠軍打<b>冠軍戰，一場定勝負</b>。敗部決賽的敗者為第 3 名。</p>`,
-    groups: `<p><b>預賽：</b>依種子蛇形分成 ${c.group_count} 組，組內單循環，每組前 ${c.advance_count} 名晉級。</p>
-      <p><b>總決賽：</b>${c.final_format === 'super'
-        ? '晉級選手打<b>超級循環賽</b>：預賽同組的選手不再重打，直接帶入預賽的對戰成績，只打不同組之間的比賽，依循環賽名次規則排出最終名次。'
-        : '晉級選手進行<b>單淘汰賽</b>，各組第 1 名為前段種子，同組晉級的選手分在不同半區；並加打<b>季軍賽</b>。'}</p>
-      <p><b>循環賽名次判定：</b></p>${tie}`,
-  }[c.format];
+    </ol>
+    <div class="rule-example"><b>例：</b>甲、乙、丙三人都是 1 勝 1 敗：甲 2:0 勝乙、乙 2:1 勝丙、丙 2:1 勝甲，場數勝率相同。接著比三人彼此之間的局數勝率：甲 3:2、丙 3:3、乙 2:3，名次就是 甲 → 丙 → 乙。</div>`;
+
+  let body;
+  if (c.format === 'single') {
+    body = `
+      <ol class="rule-steps">
+        <li><b>淘汰方式：</b>每場${bo('main')}，輸一場即淘汰，勝者晉級下一輪。</li>
+        ${knockoutBasics}
+        <li><b>名次：</b>決賽勝者為冠軍、敗者為亞軍；準決賽的兩位敗者再打<b>季軍賽</b>，勝者第 3 名、敗者第 4 名。</li>
+      </ol>`;
+  } else if (c.format === 'double') {
+    body = `
+      <ol class="rule-steps">
+        <li><b>淘汰方式：</b>每場${bo('main')}。每位選手要<b>輸兩場</b>才淘汰。</li>
+        <li><b>勝部與敗部：</b>所有人從<b>勝部</b>開始；在勝部輸第一場的選手掉到<b>敗部</b>繼續比賽，在敗部再輸一場就淘汰。</li>
+        ${knockoutBasics}
+        <li><b>冠軍戰：</b>勝部冠軍對敗部冠軍，<b>一場定勝負</b>（勝部冠軍輸了也不再加賽）。</li>
+        <li><b>名次：</b>冠軍戰勝者第 1 名、敗者第 2 名；敗部決賽的敗者第 3 名，敗部準決賽的敗者第 4 名。</li>
+      </ol>`;
+  } else {
+    body = `
+      <ol class="rule-steps">
+        <li><b>預賽分組：</b>依種子順序<b>蛇形</b>分成 ${c.group_count} 組（1 號種子在 A 組、2 號在 B 組…，下一輪反過來排），讓各組實力平均。</li>
+        <li><b>預賽：</b>組內單循環，每場${bo('group')}，每組前 <b>${c.advance_count}</b> 名晉級總決賽。</li>
+        <li><b>總決賽：</b>每場${bo('final')}。${c.final_format === 'super'
+          ? '晉級選手打<b>超級循環賽</b>：預賽<b>同組</b>的選手<b>不再重打</b>，直接帶入預賽兩人之間的對戰成績；只打<b>不同組</b>之間的比賽，依下方循環賽名次規則排出最終名次。'
+          : '晉級選手進行<b>單淘汰賽</b>：各組第 1 名為前段種子、優先輪空，<b>同組晉級的選手分在不同半區</b>，最快在決賽才會再遇到；準決賽兩位敗者加打<b>季軍賽</b>。'}</li>
+      </ol>
+      <p><b>循環賽名次判定</b>（預賽各組${c.final_format === 'super' ? '、超級循環賽' : ''}適用）：</p>
+      ${tie}
+      <p class="rule-foot">＊各組還沒打完時，排名表的名次為暫定；整組打完後若仍有戰績完全相同，才由主辦抽籤。勝率計算時，沒有輸過（分母為 0）視為最高。</p>`;
+  }
   return `
-    <section class="rules card">
-      <h3>📖 ${DIVISIONS[v.div]} 賽制說明</h3>
-      <p><b>賽制：</b>${esc(formatSummary(v))}。每局 11 分制（10:10 後需領先 2 分）。</p>
+    <section class="rules card" id="rules" aria-labelledby="rules-title">
+      <h3 id="rules-title">📖 ${DIVISIONS[v.div]} 賽制與名次規則</h3>
+      <p><b>賽制：</b>${esc(formatSummary(v))}。</p>
+      <p><b>計分：</b>每局 11 分制，10:10 後需領先 2 分才獲勝。</p>
       ${body}
+      <p class="rule-foot">＊比賽結果以主辦單位登錄的比分為準，頁面會即時更新。</p>
     </section>`;
 }
 
@@ -357,8 +392,9 @@ function rulesCard(v) {
 
 function renderCompetition(v, { admin }) {
   if (v.phase === 'setup') {
-    return `${emptyState(admin ? '尚未產生賽程，請在上方設定賽制與選手名單。' : '主辦單位尚未產生賽程。')}
-      ${!admin && v.players.length ? `<section class="card"><h3>報名選手（${v.players.length}）</h3><p>${v.players.map((p) => esc(p.name)).join('、')}</p></section>` : ''}`;
+    return `${emptyState(admin ? '尚未產生賽程，請在上方設定賽制與選手名單。' : '主辦單位尚未產生賽程，以下為目前預定的賽制與規則。')}
+      ${!admin && v.players.length ? `<section class="card"><h3>報名選手（${v.players.length}）</h3><p>${v.players.map((p) => esc(p.name)).join('、')}</p></section>` : ''}
+      ${admin ? '' : rulesCard(v)}`;
   }
   const pct = v.total ? Math.round((v.done / v.total) * 100) : 0;
   const picker = `
@@ -400,7 +436,7 @@ function renderCompetition(v, { admin }) {
   }
   return `
     <section class="card status">
-      <p class="status-text"><b>${esc(formatSummary(v))}</b></p>
+      <p class="status-text"><b>${esc(formatSummary(v))}</b>　<a class="rules-link" href="#rules">📖 賽制與名次規則</a></p>
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="賽事進度"><div class="progress-bar" style="width:${pct}%"></div></div>
       <p class="status-text">賽事進度 <b>${v.done}</b> / ${v.total} 場（${pct}%）${v.phase === 'group' ? '・預賽進行中' : v.phase === 'final' ? '・總決賽' : ''}</p>
       ${picker}
