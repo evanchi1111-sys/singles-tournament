@@ -43,6 +43,8 @@ const playerById = (id) => state.players.find((p) => p.id === id);
 const nameOf = (id) => playerById(id)?.name ?? '（已刪除）';
 const playersOf = (div) => state.players.filter((p) => p.division === div).sort((a, b) => a.seed - b.seed || a.created_at.localeCompare(b.created_at));
 const matchesOf = (div, stage) => state.matches.filter((m) => m.division === div && m.stage === stage);
+// 每場局數：總決賽可另外設定，沒設定就跟預賽相同
+const bestOfFor = (cfg, stage) => (stage === 'final' && cfg.final_best_of ? cfg.final_best_of : cfg.best_of);
 
 let toastTimer;
 function toast(message, kind = 'info') {
@@ -107,7 +109,7 @@ function divisionView(div) {
     }).map((g) => g.grp);
   }
   if (final.length) {
-    v.finalRes = resolveStage(final, cfg.best_of);
+    v.finalRes = resolveStage(final, bestOfFor(cfg, 'final'));
     if (cfg.final_format === 'super') {
       const qualIds = [...new Set(final.flatMap((m) => [m.src1.seed, m.src2.seed]))];
       // 晉級者之間：同組的預賽成績＋總決賽的新對戰
@@ -196,7 +198,7 @@ function renderDivisionTabs() {
 function matchBox(info, { label = '', admin = false, stage }) {
   const m = info.match;
   const me = state.me;
-  const out = matchOutcome(info.state === 'done' || info.state === 'live' ? m.games : [], state.divisions[m.division].best_of);
+  const out = matchOutcome(info.state === 'done' || info.state === 'live' ? m.games : [], bestOfFor(state.divisions[m.division], m.stage));
   const line = (pid, isBye, side) => {
     const won = info.state === 'done' && info.winner === pid;
     const text = pid ? esc(nameOf(pid)) : isBye ? '<i>輪空</i>' : '<i>待定</i>';
@@ -300,8 +302,17 @@ function formatSummary(v) {
   const c = v.cfg;
   const base = `${FORMATS[c.format]}・每場${BEST_OF[c.best_of]}`;
   if (c.format !== 'groups') return base + (c.format === 'single' ? '・加打季軍賽' : '・冠軍戰一場定勝負');
-  return `${base}・分 ${c.group_count} 組，每組取前 ${c.advance_count} 名進入總決賽（${FINAL_FORMATS[c.final_format]}）`;
+  const finalBo = bestOfFor(c, 'final');
+  const finalText = finalBo !== c.best_of ? `，總決賽每場${BEST_OF[finalBo]}` : '';
+  return `${base}・分 ${c.group_count} 組，每組取前 ${c.advance_count} 名進入總決賽（${FINAL_FORMATS[c.final_format]}${finalText}）`;
 }
+
+// 總決賽每場局數的選單（空白 = 與預賽相同）
+const finalBestOfSelect = (c) => `
+  <label>總決賽每場局數<select data-change="div-setting" data-field="final_best_of">
+    <option value="" ${!c.final_best_of ? 'selected' : ''}>與預賽相同（${BEST_OF[c.best_of]}）</option>
+    ${Object.entries(BEST_OF).map(([k, l]) => `<option value="${k}" ${c.final_best_of === Number(k) ? 'selected' : ''}>${l}</option>`).join('')}
+  </select></label>`;
 
 // 我的下一場
 function myBanner(v) {
@@ -436,7 +447,7 @@ function renderSetup(v) {
         <label>賽制<select data-change="div-setting" data-field="format">
           ${Object.entries(FORMATS).map(([k, l]) => `<option value="${k}" ${c.format === k ? 'selected' : ''}>${l}</option>`).join('')}
         </select></label>
-        <label>每場局數<select data-change="div-setting" data-field="best_of">
+        <label>${c.format === 'groups' ? '預賽每場局數' : '每場局數'}<select data-change="div-setting" data-field="best_of">
           ${Object.entries(BEST_OF).map(([k, l]) => `<option value="${k}" ${c.best_of === Number(k) ? 'selected' : ''}>${l}</option>`).join('')}
         </select></label>
         ${c.format === 'groups' ? `
@@ -444,7 +455,8 @@ function renderSetup(v) {
           <label>每組晉級人數<input type="number" min="1" max="8" value="${c.advance_count}" data-change="div-setting" data-field="advance_count"></label>
           <label>總決賽<select data-change="div-setting" data-field="final_format">
             ${Object.entries(FINAL_FORMATS).map(([k, l]) => `<option value="${k}" ${c.final_format === k ? 'selected' : ''}>${l}</option>`).join('')}
-          </select></label>` : ''}
+          </select></label>
+          ${finalBestOfSelect(c)}` : ''}
       </div>
       ${groupInfo}
       <p class="note">${{ single: '單淘汰：輸一場即淘汰，加打季軍賽。', double: '雙淘汰：輸兩場才淘汰，冠軍戰一場定勝負（至少 3 人）。', groups: '分組循環：依種子蛇形分組，組內單循環，各組前幾名進入總決賽。' }[c.format]}</p>
@@ -503,6 +515,7 @@ function renderAdmin() {
       <label>總決賽<select data-change="div-setting" data-field="final_format">
         ${Object.entries(FINAL_FORMATS).map(([k, l]) => `<option value="${k}" ${v.cfg.final_format === k ? 'selected' : ''}>${l}</option>`).join('')}
       </select></label>
+      ${finalBestOfSelect(v.cfg)}
     </div>` : '';
   const groupHint = v.phase === 'group'
     ? (!v.groupsDone ? '<p class="note">預賽全部打完後，才能產生總決賽。產生前仍可調整晉級人數與總決賽賽制。</p>'
@@ -574,7 +587,7 @@ function openScoreModal(div, stage, code) {
   const res = stage === 'main' ? v.res : stage === 'group' ? v.groupRes : v.finalRes;
   const info = res.get(code);
   const stageMatches = stage === 'main' ? v.main : stage === 'group' ? v.group : v.final;
-  const bestOf = v.cfg.best_of;
+  const bestOf = bestOfFor(v.cfg, stage);
   const need = Math.ceil(bestOf / 2);
   const n1 = nameOf(info.p1);
   const n2 = nameOf(info.p2);
@@ -832,7 +845,7 @@ function exportCtx() {
       const push = (res, stageName, labelOf) => {
         for (const r of res ? res.values() : []) {
           if (r.state !== 'done' && r.state !== 'live') continue;
-          const o = matchOutcome(r.match.games, v.cfg.best_of);
+          const o = matchOutcome(r.match.games, bestOfFor(v.cfg, r.match.stage));
           matches.push({ stage: stageName, round: labelOf(r.match), p1: nameOf(r.p1), p2: nameOf(r.p2), score: `${o.w1} : ${o.w2}`,
             games: r.match.games.map((g) => `${g[0]}:${g[1]}`).join('、'), winner: r.winner ? nameOf(r.winner) : '（進行中）' });
         }
@@ -867,7 +880,9 @@ app.addEventListener('change', (e) => {
     render();
   } else if (kind === 'div-setting') {
     const field = el.dataset.field;
-    const value = ['best_of', 'group_count', 'advance_count'].includes(field) ? Number(el.value) : el.value;
+    const value = field === 'final_best_of'
+      ? (el.value ? Number(el.value) : null)
+      : ['best_of', 'group_count', 'advance_count'].includes(field) ? Number(el.value) : el.value;
     if (field === 'group_count' && !(value >= 2 && value <= 32)) return toast('組數需為 2～32', 'error');
     if (field === 'advance_count' && !(value >= 1 && value <= 8)) return toast('晉級人數需為 1～8', 'error');
     el.blur();

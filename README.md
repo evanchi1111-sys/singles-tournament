@@ -21,17 +21,17 @@
 
 ## 設定
 可與雙打計分、團體賽排點系統共用同一個 Supabase 專案（本系統資料表以 `sg_` 開頭）。
-1. **SQL Editor** → **New query** → 貼上 [`supabase/setup.sql`](supabase/setup.sql) → **Run**。
+1. **SQL Editor** → **New query** → 貼上 [`supabase/setup.sql`](supabase/setup.sql) → **Run**。（2026-10-08 以前建立的專案，另外執行一次 [`supabase/upgrade-01-final-best-of.sql`](supabase/upgrade-01-final-best-of.sql)）
 2. 主辦帳號：**Authentication** → **Users** 需有 `organizer@dsc-table-tennis.app`（與 `setup.sql` 第 4 段、`js/config.js` 一致）。
 3. [`js/config.js`](js/config.js) 填入 Project URL 與 publishable（anon）key。
 4. 倉庫 **Settings** → **Pages** → Branch `main`、`/ (root)`。
 
 ## 比賽流程
 1. **主辦管理** → 登入 → 選組別。
-2. ① 設定賽制與每場局數（分組循環另設組數、晉級人數、總決賽賽制）。
+2. ① 設定賽制與每場局數（分組循環另設組數、晉級人數、總決賽賽制與總決賽每場局數）。
 3. ② 新增或批次匯入選手，用 ↑↓ 調整種子順序，或按「隨機抽籤」。
 4. ③ 產生賽程。點對戰方框登錄比分。
-5. 分組循環：預賽打完 →（必要時抽籤）→「產生總決賽」。總決賽產生前仍可調整晉級人數與總決賽賽制。
+5. 分組循環：預賽打完 →（必要時抽籤）→「產生總決賽」。總決賽產生前仍可調整晉級人數、總決賽賽制與總決賽每場局數。
 6. 賽後「匯出 Excel」或「複製 LINE 成績」。
 
 ## 檔案

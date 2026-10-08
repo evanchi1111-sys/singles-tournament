@@ -1,6 +1,6 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ORGANIZER_EMAIL } from './config.js';
 
-export const DEFAULT_DIVISION = { format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single' };
+export const DEFAULT_DIVISION = { format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null };
 
 export function isConfigured() {
   return /^https:\/\/.+/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;

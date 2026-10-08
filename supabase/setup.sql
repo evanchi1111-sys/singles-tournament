@@ -22,8 +22,10 @@ create table if not exists public.sg_divisions (
   group_count   int  not null default 2 check (group_count between 2 and 32),
   advance_count int  not null default 2 check (advance_count between 1 and 8),                    -- 每組晉級人數
   final_format  text not null default 'single' check (final_format in ('single', 'super')),      -- 總決賽：單淘汰／超級循環
+  final_best_of int check (final_best_of in (3, 5, 7)),                                         -- 總決賽每場局數（空白 = 與預賽相同）
   updated_at    timestamptz not null default now()
 );
+alter table public.sg_divisions add column if not exists final_best_of int check (final_best_of in (3, 5, 7));
 insert into public.sg_divisions (id) values ('competitive'), ('fun') on conflict (id) do nothing;
 
 create table if not exists public.sg_players (
