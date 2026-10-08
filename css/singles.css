@@ -1,0 +1,93 @@
+/* 單打賽系統專用樣式（基礎樣式在 style.css） */
+
+.topbar { padding-bottom: 0; }
+.viewtabs { display: grid; gap: 4px; padding-bottom: 8px; }
+.viewtabs.two { grid-template-columns: 1fr 1fr; }
+.viewtab { min-height: 44px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, .1); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; }
+.viewtab.on { background: #fff; color: var(--brand); }
+@media (prefers-color-scheme: dark) { .viewtab.on { background: var(--card); color: var(--text); } }
+
+.card { margin-bottom: 14px; }
+.card h2, .card h3 { margin: 0 0 8px; }
+.narrow { max-width: 480px; margin: 0 auto 16px; }
+.form { display: grid; gap: 12px; }
+.grid-form { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.section-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.section-title { margin: 18px 2px 8px; font-size: 16px; color: var(--brand-2); }
+.count { font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--info-bg); color: var(--brand-2); }
+.chip.ok { background: var(--ok-bg); color: var(--ok); font-size: 12px; vertical-align: middle; }
+.actions.wrap { flex-wrap: wrap; }
+.actions { margin-top: 10px; }
+.inline-form { display: flex; gap: 8px; margin: 10px 0; }
+.inline-form input { flex: 1; min-width: 0; }
+.tab .count { background: transparent; color: inherit; padding: 0; }
+
+/* 種子名單 */
+.seed-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.seed-list li { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.seed-no { min-width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 8px; background: var(--brand); color: #fff; font-weight: 800; font-size: 13px; }
+.seed-name { flex: 1; font-weight: 700; padding-left: 6px; }
+.icon-btn { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--sub); cursor: pointer; font-size: 15px; }
+.icon-btn:hover:not([disabled]) { background: var(--info-bg); color: var(--brand-2); }
+.icon-btn.del:hover:not([disabled]) { background: var(--bad-bg); color: var(--bad); }
+.icon-btn[disabled] { opacity: .3; cursor: default; }
+
+/* 對戰方框 */
+.mbox {
+  display: block; width: 100%; text-align: left; font: inherit; color: inherit;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 6px 8px; font-size: 14px;
+}
+.mbox.clickable { cursor: pointer; }
+.mbox.clickable:hover { border-color: var(--brand-2); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-2) 25%, transparent); }
+.mbox.live { border-color: var(--accent); }
+.mbox.bye, .mbox.pending { background: var(--bg); }
+.mbox.bye { opacity: .7; }
+.mbox.mine { box-shadow: inset 4px 0 0 var(--accent); }
+.mhead { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--sub); margin-bottom: 2px; }
+.mbadge { font-size: 11px; font-weight: 800; padding: 0 7px; border-radius: 999px; background: var(--bg); color: var(--sub); }
+.mbadge.live { background: var(--accent); color: #fff; }
+.mline { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+.mline + .mline { border-top: 1px dashed var(--line); }
+.mline .pname { overflow-wrap: anywhere; }
+.mline .pname i { color: var(--sub); font-style: normal; }
+.mline .pscore { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 1.2em; text-align: right; }
+.mline.win { font-weight: 800; color: var(--ok); }
+.mline.me .pname { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.mgames { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.mgames span { font-size: 11px; padding: 0 5px; border-radius: 5px; background: var(--bg); font-variant-numeric: tabular-nums; }
+.mhint { font-size: 12px; color: var(--accent); font-weight: 700; margin-top: 2px; }
+.mwarn { font-size: 12px; color: var(--bad); font-weight: 700; margin-top: 2px; }
+
+/* 淘汰賽籤表：每一輪一欄，可左右捲動 */
+.bracket { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 12px; -webkit-overflow-scrolling: touch; }
+.bcol { display: flex; flex-direction: column; min-width: 180px; flex: 0 0 180px; }
+.bcol h4 { margin: 0 0 8px; text-align: center; font-size: 13px; color: var(--brand-2); }
+.bmatches { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+.single-box { max-width: 260px; }
+
+/* 分組 */
+.group-card .match-list, .match-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-top: 10px; }
+tr.qualified td { background: color-mix(in srgb, var(--ok-bg) 70%, transparent); }
+.qtag { font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: var(--ok); color: #fff; vertical-align: middle; }
+.subtabs.two { grid-template-columns: 1fr 1fr; }
+
+/* 名次 */
+.placings ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.placings li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--bg); font-weight: 700; font-size: 16px; }
+.placings li.mine { background: var(--mine); }
+.medal { min-width: 28px; text-align: center; font-size: 20px; }
+
+/* 比分登錄 */
+.modal { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; }
+
+/* 賽制說明 */
+.rules { margin-top: 16px; line-height: 1.7; }
+.rules h3 { font-size: 17px; color: var(--brand-2); }
+.rules p { margin: 6px 0; }
+.rule-steps { margin: 8px 0; padding-left: 1.4em; display: grid; gap: 6px; }
+
+@media (max-width: 480px) {
+  .viewtab { font-size: 14px; }
+  .bcol { min-width: 160px; flex-basis: 160px; }
+}
