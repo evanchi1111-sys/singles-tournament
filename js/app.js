@@ -101,11 +101,23 @@ function divisionView(div) {
       return { grp: g, ids, rows, done, matches: group.filter((m) => m.grp === g) };
     });
     v.groupsDone = v.groups.every((g) => g.done);
-    // 晉級名額內有「需抽籤但還沒抽」的同分，先不能產生總決賽
+    // 有「需抽籤但還沒抽」的同分會影響總決賽時，先不能產生總決賽：
+    // ・同分橫跨晉級線（決定誰晉級）→ 一定要抽
+    // ・總決賽是單淘汰時，晉級者之間的名次決定種子與半區 → 晉級名額內的同分也要抽
     const k = cfg.advance_count;
     v.unresolved = v.groups.filter((g) => {
-      const tied = g.rows.filter((r) => r.drawTied && r.draw == null);
-      return tied.some((r) => r.rank <= k) && tied.some((r) => r.rank > k);
+      const clusters = new Map();
+      for (const r of g.rows) {
+        if (!r.drawTied) continue;
+        if (!clusters.has(r.tieGroup)) clusters.set(r.tieGroup, []);
+        clusters.get(r.tieGroup).push(r);
+      }
+      return [...clusters.values()].some((c) => {
+        if (!c.some((r) => r.draw == null)) return false;
+        const inside = c.some((r) => r.rank <= k);
+        const outside = c.some((r) => r.rank > k);
+        return (inside && outside) || (inside && cfg.final_format === 'single');
+      });
     }).map((g) => g.grp);
   }
   if (final.length) {
@@ -377,7 +389,7 @@ function rulesCard(v) {
         <li><b>預賽：</b>組內單循環，每場${bo('group')}，每組前 <b>${c.advance_count}</b> 名晉級總決賽。</li>
         <li><b>總決賽：</b>每場${bo('final')}。${c.final_format === 'super'
           ? '晉級選手打<b>超級循環賽</b>：預賽<b>同組</b>的選手<b>不再重打</b>，直接帶入預賽兩人之間的對戰成績；只打<b>不同組</b>之間的比賽，依下方循環賽名次規則排出最終名次。'
-          : '晉級選手進行<b>單淘汰賽</b>：各組第 1 名為前段種子、優先輪空，<b>同組晉級的選手分在不同半區</b>，最快在決賽才會再遇到；準決賽兩位敗者加打<b>季軍賽</b>。'}</li>
+          : '晉級選手進行<b>單淘汰賽</b>：各組第 1 名為前段種子、優先輪空；<b>同組第 1、2 名分在不同半區</b>，最快在決賽才會再遇到；同組其他晉級選手也盡量安排越晚相遇，不會在第一輪碰頭。準決賽兩位敗者加打<b>季軍賽</b>。'}</li>
       </ol>
       <p><b>循環賽名次判定</b>（預賽各組${c.final_format === 'super' ? '、超級循環賽' : ''}適用）：</p>
       ${tie}
@@ -560,7 +572,7 @@ function renderAdmin() {
     </div>` : '';
   const groupHint = v.phase === 'group'
     ? (!v.groupsDone ? '<p class="note">預賽全部打完後，才能產生總決賽。產生前仍可調整晉級人數與總決賽賽制。</p>'
-      : v.unresolved.length ? `<p class="banner warn">${v.unresolved.join('、')} 組的晉級名額有戰績相同的選手，請先在該組排名表填入抽籤順位。</p>` : '')
+      : v.unresolved.length ? `<p class="banner warn">${v.unresolved.join('、')} 組有戰績完全相同的選手${v.cfg.final_format === 'single' ? '，會影響晉級或總決賽的種子位置' : '，會影響誰晉級'}，請先在該組排名表填入抽籤順位。</p>` : '')
     : '';
   return `
     ${renderDivisionTabs()}

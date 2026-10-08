@@ -148,26 +148,39 @@ export function knockoutSeeds(groupRanks, advance) {
     const tier = t % 2 === 0 ? groupRanks : [...groupRanks].reverse();
     for (const g of tier) if (g.ids[t]) seeds.push({ id: g.ids[t], grp: g.grp, tier: t });
   }
+  // 同組選手越晚相遇越好：在第 r 輪相遇的代價為 4^(總輪數 − r)，第 1 輪相遇代價最高、決賽最低。
+  // 只在「同一名次層」之間交換（各組第 1 名永遠是前段種子），反覆交換直到代價不再下降。
   const size = nextPow2(seeds.length);
+  const R = Math.log2(size);
   const order = seedOrder(size);
-  const half = (i) => (order.indexOf(i + 1) < size / 2 ? 0 : 1);
-  const leaderHalf = (grp) => half(seeds.findIndex((s) => s.grp === grp && s.tier === 0));
-  const conflict = (i) => seeds[i].tier > 0 && half(i) === leaderHalf(seeds[i].grp);
-  for (let pass = 0; pass < 10; pass++) {
-    let changed = false;
+  const posOf = (i) => order.indexOf(i + 1); // 第 i 位種子在籤表的位置
+  const meetRound = (i, j) => Math.floor(Math.log2(posOf(i) ^ posOf(j))) + 1;
+  // 最優先：各組第 1、2 名分在不同半區（決賽前不會相遇）
+  const cost = () => {
+    let c = 0;
     for (let i = 0; i < seeds.length; i++) {
-      if (!conflict(i)) continue;
-      for (let j = 0; j < seeds.length; j++) {
-        if (j === i || seeds[j].tier !== seeds[i].tier || half(j) === half(i)) continue;
-        // 交換後兩人都不能和自己組的第 1 名同半區
-        if (half(j) !== leaderHalf(seeds[i].grp) && half(i) !== leaderHalf(seeds[j].grp)) {
-          [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
-          changed = true;
-          break;
-        }
+      for (let j = i + 1; j < seeds.length; j++) {
+        if (seeds[i].grp !== seeds[j].grp) continue;
+        const r = meetRound(i, j);
+        c += 4 ** (R - r);
+        if (seeds[i].tier + seeds[j].tier === 1 && r < R) c += 4 ** (R + 2);
       }
     }
-    if (!changed) break;
+    return c;
+  };
+  let best = cost();
+  for (let pass = 0; pass < 50 && best > 0; pass++) {
+    let improved = false;
+    for (let i = 0; i < seeds.length; i++) {
+      for (let j = i + 1; j < seeds.length; j++) {
+        if (seeds[i].tier !== seeds[j].tier || seeds[i].tier === 0) continue;
+        [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
+        const c = cost();
+        if (c < best) { best = c; improved = true; }
+        else [seeds[i], seeds[j]] = [seeds[j], seeds[i]];
+      }
+    }
+    if (!improved) break;
   }
   return seeds.map((s) => s.id);
 }
@@ -263,6 +276,7 @@ export function standings(ids, results, drawOf = () => null) {
     return rows;
   }
   const h2h = (a, b) => results.find((r) => (r.a === a.id && r.b === b.id) || (r.a === b.id && r.b === a.id));
+  let tieCount = 0;
   const drawSort = (list) => [...list].sort((x, y) => (x.draw ?? 999) - (y.draw ?? 999));
 
   const pair = ([a, b]) => {
@@ -278,6 +292,7 @@ export function standings(ids, results, drawOf = () => null) {
       }
     }
     a.drawTied = b.drawTied = true;
+    a.tieGroup = b.tieGroup = ++tieCount;
     a.basis = b.basis = '戰績相同・抽籤';
     return drawSort([a, b]);
   };
@@ -291,7 +306,8 @@ export function standings(ids, results, drawOf = () => null) {
       }
     }
     if (step >= STEPS.length) {
-      members.forEach((s) => { s.drawTied = true; s.basis = '戰績相同・抽籤'; });
+      const id = ++tieCount; // 同一群完全相同、需要一起抽籤的選手
+      members.forEach((s) => { s.drawTied = true; s.tieGroup = id; s.basis = '戰績相同・抽籤'; });
       return drawSort(members);
     }
     const { key, label } = STEPS[step];
