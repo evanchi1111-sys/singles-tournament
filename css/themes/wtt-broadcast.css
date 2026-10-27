@@ -1,0 +1,80 @@
+/* 風格 D「賽事轉播」：參考世界桌球聯合會 (WTT) 官網——純黑底、電黃色行動按鈕、粗黑體白字、青藍漸層標籤、近乎直角。 */
+:root, :root:root {
+  --bg: #000; --card: #111; --text: #fff; --sub: #a9a9a9; --line: #333;
+  --brand: #1aa6c4; --brand-2: #4cc8e2; --accent: #ffff00;
+  --ok: #3be08a; --ok-bg: #0f2f20; --bad: #ff6b60; --bad-bg: #3a1714;
+  --warn-bg: #2e2a05; --warn: #ffe94d; --info-bg: #1b1b1b; --mine: #2a2a00;
+  --radius: 2px; --shadow: none;
+  --tag: linear-gradient(90deg, #1aa6c4, #1b5fa8);
+  color-scheme: dark;
+}
+body { font-family: "Barlow", "Roboto", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif; background: #000; }
+.topbar { background: #000; border-bottom: 1px solid var(--line); padding-bottom: 0; }
+.viewtabs { padding-bottom: 0; gap: 0; }
+.brand h1 { font-size: 20px; font-weight: 800; letter-spacing: .02em; }
+.brand-icon { background: var(--accent); color: #000; border-radius: 2px; width: 36px; height: 36px; display: inline-grid; place-items: center; font-size: 22px; }
+.live { opacity: 1; color: var(--sub); }
+.topbar .btn { background: transparent; color: #fff; border: 1px solid #fff; border-radius: 2px; }
+.topbar .btn:hover { background: #fff; color: #000; }
+.viewtab { background: transparent; color: #fff; border-radius: 0; border-bottom: 3px solid transparent; font-weight: 700; }
+.viewtab.on { background: transparent; color: var(--accent); border-bottom-color: var(--accent); }
+
+.card, .match, .table-wrap, .team-list, .center-card { background: var(--card); border: 0; border-radius: var(--radius); }
+.btn { border-radius: 2px; background: #eaeaea; color: #000; border: 0; font-weight: 700; }
+.btn:hover { background: #fff; }
+.btn.primary { background: var(--accent); color: #000; }
+.btn.primary:hover { background: #ffff66; filter: none; }
+.btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+.tab { background: #111; border: 0; border-radius: 2px; color: #fff; border-bottom: 3px solid transparent; }
+.tab.on { background: #111; color: var(--accent); border-bottom-color: var(--accent); }
+.subtabs { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0; }
+.subtab { border-radius: 0; color: #fff; border-bottom: 3px solid transparent; }
+.subtab.on { background: transparent; color: var(--accent); border-bottom-color: var(--accent); }
+.format-pick { background: #111; border-color: var(--line); border-radius: 2px; }
+.seg { border-radius: 2px; color: #fff; }
+.seg.on { background: var(--accent); color: #000; box-shadow: none; }
+.chip, .count, .phase, .mbadge, .status-badge { border-radius: 2px; background: var(--tag); color: #fff; font-weight: 700; }
+.status-badge { background: #2a2a2a; color: var(--sub); }
+.status-badge.completed { background: #2a2a2a; color: var(--ok); }
+.status-badge.playing, .mbadge.live { background: var(--accent); color: #000; }
+.chip.ok, .phase.active { background: var(--ok-bg); color: var(--ok); }
+.phase.setup { background: var(--warn-bg); color: var(--warn); }
+.progress { height: 4px; border-radius: 0; background: #2a2a2a; }
+.progress-bar { border-radius: 0; background: var(--accent); }
+
+.round-title, .section-title, .bcol h4, .rules h3 { color: #fff; font-weight: 800; font-size: 20px; letter-spacing: 0; padding-left: 12px; border-left: 4px solid var(--accent); }
+.bcol h4 { font-size: 15px; text-align: left; }
+.match { padding: 14px 16px; }
+.match.playing { box-shadow: inset 0 3px 0 var(--accent); }
+.match.mine { background: var(--mine); }
+button.match:hover { background: #1c1c1c; }
+.side { font-weight: 600; }
+.side .score, .score-total, .mline .pscore { font-family: "Barlow Condensed", "Barlow", sans-serif; font-weight: 700; color: #fff; }
+.side .score { font-size: 30px; border-left-color: var(--line); }
+.score-total { font-size: 44px; color: var(--accent); }
+.side.won { color: var(--accent); }
+.side.won .score { color: var(--accent); }
+.side.won .name::after { content: ""; }
+.pt.w { color: #fff; }
+.mbox { background: #111; border: 1px solid var(--line); border-radius: 2px; }
+.mbox.bye, .mbox.pending { background: #0a0a0a; }
+.mbox.live { border-color: var(--accent); }
+.mbox.clickable:hover { border-color: #fff; box-shadow: none; }
+.mline + .mline { border-top: 1px solid var(--line); }
+.mline.win, .mline.win .pscore { color: var(--accent); }
+th { background: #000; color: var(--sub); font-weight: 700; border-bottom: 2px solid #fff; }
+td { border-bottom-color: #222; }
+.matrix th.left { background: #111; color: #fff; }
+.rank { font-family: "Barlow Condensed", sans-serif; font-size: 28px; color: var(--accent); }
+.seed-no { border-radius: 2px; background: var(--accent); color: #000; }
+.idx { background: #2a2a2a; color: #fff; border-radius: 2px; }
+.seed-list li, .placings li { background: #111; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+.placings li.mine { background: var(--mine); }
+.modal { background: #111; border: 1px solid var(--line); border-radius: 2px; border-top: 4px solid var(--accent); }
+.backdrop { background: rgba(0, 0, 0, .8); }
+.pt-input { background: #000; border: 2px solid #444; border-radius: 2px; color: #fff; font-family: "Barlow Condensed", sans-serif; font-size: 28px; }
+input, select, textarea { background: #000; border: 1px solid #555; border-radius: 2px; }
+.banner.demo, .banner.warn { border-radius: 2px; }
+#toast { background: var(--accent); color: #000; border-radius: 2px; }
+#toast.ok { background: var(--ok); color: #000; }
+#toast.error { background: var(--bad); color: #000; }

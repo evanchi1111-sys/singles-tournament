@@ -1,0 +1,81 @@
+/* 風格 C「貼紙派對」：粗黑邊、硬陰影、糖果色——適合社團、校內和親友的輕鬆比賽。 */
+:root, :root:root {
+  --ink: #1b1840;
+  --bg: #e9e4ff; --card: #ffffff; --text: #1b1840; --sub: #5c5890; --line: #1b1840;
+  --brand: #3a2fd6; --brand-2: #3a2fd6; --accent: #ff5a6e;
+  --ok: #0c8f5c; --ok-bg: #bff5dc; --bad: #d6203a; --bad-bg: #ffd3d9;
+  --warn-bg: #ffe98a; --warn: #5a4300; --info-bg: #d9f1ff; --mine: #fff2a8;
+  --radius: 16px; --shadow: 4px 4px 0 var(--ink);
+  color-scheme: light;
+}
+body { font-family: "Zen Maru Gothic", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; font-weight: 500;
+  background-color: var(--bg); background-image: radial-gradient(#cfc6ff 1.6px, transparent 1.7px); background-size: 22px 22px; }
+.topbar { background: var(--accent); color: var(--ink); border-bottom: 3px solid var(--ink); }
+.brand h1 { font-size: 22px; font-weight: 900; }
+.brand-icon { display: inline-grid; place-items: center; width: 44px; height: 44px; font-size: 26px; background: #fff; border: 3px solid var(--ink); border-radius: 50%; box-shadow: 3px 3px 0 var(--ink); transform: rotate(-8deg); }
+.live { opacity: 1; font-weight: 700; }
+.topbar .btn { background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.topbar .btn:hover { background: #fff; }
+.viewtab { background: #fff; color: var(--ink); border: 3px solid var(--ink); border-radius: 999px; font-weight: 900; min-height: 42px; }
+.viewtab.on { background: var(--ink); color: #fff; }
+.viewtabs { padding: 4px 0 12px; gap: 8px; }
+
+.card, .match, .table-wrap, .team-list, .center-card { border: 3px solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card { background: #fff; }
+.btn { border: 3px solid var(--ink); border-radius: 999px; box-shadow: 3px 3px 0 var(--ink); font-weight: 900; transition: transform .08s, box-shadow .08s; }
+.btn:hover { border-color: var(--ink); background: #fffbe0; }
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+.btn.primary { background: var(--brand); border-color: var(--ink); color: #fff; }
+.btn.primary:hover { background: var(--brand); filter: none; }
+.btn.danger { border-color: var(--ink); color: var(--bad); }
+.tab { border: 3px solid var(--ink); border-radius: 999px; box-shadow: 3px 3px 0 var(--ink); }
+.tab.on { background: var(--brand); border-color: var(--ink); color: #fff; }
+.subtabs { border: 3px solid var(--ink); border-radius: 999px; padding: 4px; background: #fff; }
+.subtab { border-radius: 999px; font-weight: 900; color: var(--ink); }
+.subtab.on { background: #ffe98a; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+.format-pick { border: 3px solid var(--ink); border-radius: 999px; background: #fff; }
+.seg { border-radius: 999px; color: var(--ink); }
+.seg.on { background: #ffe98a; box-shadow: inset 0 0 0 2px var(--ink); }
+.chip, .count, .status-badge, .phase, .mbadge, .qtag { border: 2px solid var(--ink); color: var(--ink); background: #fff; }
+.phase.setup { background: var(--warn-bg); }
+.phase.active, .chip.ok, .status-badge.completed { background: var(--ok-bg); color: var(--ink); }
+.status-badge.playing, .mbadge.live { background: var(--accent); color: #fff; }
+.progress { height: 18px; border: 3px solid var(--ink); background: #fff; }
+.progress-bar { background: repeating-linear-gradient(135deg, var(--ok) 0 10px, #35c88b 10px 20px); }
+
+.round-title, .section-title, .bcol h4, .rules h3 { color: var(--ink); font-weight: 900; font-size: 18px; }
+.round-title::before { content: "●"; color: var(--accent); margin-right: 8px; }
+.bcol h4 { align-self: center; padding: 2px 14px; background: #ffe98a; border: 2px solid var(--ink); border-radius: 999px; }
+.match { padding: 12px 14px; }
+.match:nth-child(3n+2) { background: #f4fff9; }
+.match:nth-child(3n) { background: #fff6f7; }
+.match.playing { background: #fff2a8; }
+.match.mine { background: var(--mine); }
+button.match:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); border-color: var(--ink); }
+.side .score, .score-total { font-weight: 900; color: var(--brand); border-left-color: var(--ink); }
+.side .score { font-size: 26px; }
+.score-total { font-size: 38px; }
+.side.won { color: var(--ok); }
+.mbox { border: 2px solid var(--ink); border-radius: 12px; box-shadow: 2px 2px 0 var(--ink); }
+.mbox.live { background: #fff2a8; }
+.mbox.clickable:hover { border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.mline + .mline { border-top: 2px dashed var(--ink); }
+.mline.win { color: var(--ok); }
+th { background: #ffe98a; color: var(--ink); font-weight: 900; border-bottom: 3px solid var(--ink); }
+td, th { border-bottom-color: #d8d3f5; }
+.matrix th.left { background: #fff; }
+.rank { color: var(--brand); font-weight: 900; font-size: 22px; }
+.seed-no, .idx { border: 2px solid var(--ink); background: var(--brand); color: #fff; border-radius: 50%; min-width: 30px; }
+.idx { background: #d9f1ff; color: var(--ink); }
+.seed-list li { border: 2px solid var(--ink); border-radius: 999px; background: #fff; }
+.placings li { border: 3px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: 3px 3px 0 var(--ink); }
+.placings li.mine { background: var(--mine); }
+.modal { border: 3px solid var(--ink); border-radius: 22px; box-shadow: 8px 8px 0 var(--ink); }
+.backdrop { background: rgba(27, 24, 64, .6); }
+.pt-input { border: 3px solid var(--ink); border-radius: 14px; }
+input, select, textarea { border: 3px solid var(--ink); border-radius: 12px; background: #fff; }
+.rule-example, .banner { border: 2px solid var(--ink); border-radius: 12px; }
+#toast { background: var(--ink); border: 3px solid var(--ink); border-radius: 999px; }
+#toast.ok { background: var(--ok); }
+#toast.error { background: var(--bad); }
+:focus-visible { outline: 4px solid var(--brand); outline-offset: 3px; }

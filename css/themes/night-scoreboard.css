@@ -1,0 +1,63 @@
+/* 風格 B「夜場記分板」：晚上場館的 LED 記分板——炭黑底、琥珀色數字、比分會發光。 */
+:root, :root:root {
+  --bg: #141217; --card: #1e1b23; --text: #f2ebdd; --sub: #a79f93; --line: #38333f;
+  --brand: #ffb21e; --brand-2: #ffc653; --accent: #ffb21e;
+  --ok: #5fe3b0; --ok-bg: #12332a; --bad: #ff7d6e; --bad-bg: #3b1c1a;
+  --warn-bg: #3a2c10; --warn: #ffd27a; --info-bg: #2a2530; --mine: #3a2c10;
+  --radius: 4px; --shadow: none;
+  color-scheme: dark;
+}
+body { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; background: radial-gradient(1200px 500px at 50% -200px, #2a2233 0, transparent 70%), var(--bg); background-attachment: fixed; }
+.topbar { background: #0c0a0f; border-bottom: 1px solid var(--accent); box-shadow: 0 1px 24px rgba(255, 178, 30, .25); padding-bottom: 0; }
+.viewtabs { padding-bottom: 0; }
+.brand h1 { font-size: 20px; font-weight: 800; color: var(--accent); text-shadow: 0 0 14px rgba(255,178,30,.55); }
+.live { color: var(--sub); opacity: 1; }
+.topbar .btn { background: transparent; border-color: #4a4350; color: var(--text); border-radius: 3px; }
+.viewtab { background: transparent; color: var(--sub); border-radius: 3px 3px 0 0; border-bottom: 2px solid transparent; }
+.viewtab.on { background: transparent; color: var(--accent); border-bottom-color: var(--accent); text-shadow: 0 0 10px rgba(255,178,30,.5); }
+
+.card, .match, .table-wrap, .team-list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.btn { border-radius: 3px; background: #26222c; border-color: #463f4d; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1200; box-shadow: 0 0 18px rgba(255,178,30,.3); }
+.btn.danger { color: var(--bad); }
+.tab { background: var(--card); border-width: 1px; border-radius: 3px; color: var(--sub); }
+.tab.on { background: var(--accent); border-color: var(--accent); color: #1a1200; }
+.subtabs { border-radius: 3px; }
+.subtab { border-radius: 2px; }
+.subtab.on { background: var(--info-bg); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+.seg.on { background: var(--accent); color: #1a1200; box-shadow: none; }
+.chip, .count, .status-badge, .phase, .mbadge { border-radius: 2px; }
+.chip { color: var(--accent); }
+.mbadge.live, .status-badge.playing { background: var(--accent); color: #1a1200; }
+.progress { height: 6px; border-radius: 0; background: #2c2733; }
+.progress-bar { border-radius: 0; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+.round-title, .section-title, .bcol h4, .rules h3 { color: var(--accent); font-weight: 700; letter-spacing: .06em; }
+.match.playing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 22px rgba(255,178,30,.18); }
+.match.mine { background: var(--mine); }
+.side .score, .score-total, .mline .pscore { font-family: "Saira Condensed", "Barlow Condensed", "Noto Sans TC", sans-serif; font-weight: 700; color: var(--accent); text-shadow: 0 0 12px rgba(255,178,30,.5); }
+.side .score { font-size: 30px; border-left-color: var(--line); }
+.score-total { font-size: 44px; }
+.side.won { color: var(--text); }
+.side.won .score { color: var(--ok); text-shadow: 0 0 12px rgba(95,227,176,.5); }
+.pt.w { color: var(--accent); }
+.mbox { background: #17141b; border-color: var(--line); border-radius: 3px; }
+.mbox.bye, .mbox.pending { background: #131116; }
+.mbox.live { border-color: var(--accent); }
+.mline.win { color: var(--ok); }
+.mline.win .pscore { color: var(--ok); text-shadow: none; }
+.mline + .mline { border-top-color: var(--line); }
+th { background: #121015; color: var(--accent); letter-spacing: .05em; }
+.matrix th.left { background: var(--card); color: var(--text); }
+.rank { font-family: "Saira Condensed", sans-serif; font-size: 26px; color: var(--accent); }
+.seed-no { border-radius: 2px; background: var(--accent); color: #1a1200; }
+.idx { background: var(--info-bg); color: var(--accent); }
+.seed-list li, .placings li { background: #17141b; border-radius: 3px; }
+.placings li.mine { background: var(--mine); }
+.modal { background: var(--card); border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 0 60px rgba(255,178,30,.18); }
+.backdrop { background: rgba(5, 4, 8, .75); }
+.pt-input { background: #121015; border-color: #463f4d; border-radius: 3px; font-family: "Saira Condensed", sans-serif; color: var(--accent); }
+input, select, textarea { background: #121015; border-color: #463f4d; border-radius: 3px; }
+#toast { background: #2c2733; border: 1px solid var(--accent); border-radius: 3px; }
+.center-card { background: var(--card); border-color: var(--line); }
