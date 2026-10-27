@@ -1,0 +1,87 @@
+/* 風格 F「職業聯盟」：參考 MLB 官網——深海軍藍導覽列、淺灰頁面、白色圓角比分卡、亮藍膠囊按鈕、一點聯盟紅。 */
+:root, :root:root {
+  --bg: #f5f5f5; --card: #fff; --text: #1a1a1a; --sub: #5f6b7a; --line: #d9dee5;
+  --brand: #041e42; --brand-2: #0048c7; --accent: #0048c7;
+  --ok: #0a7a43; --ok-bg: #e0f3e8; --bad: #d50032; --bad-bg: #fde6ea;
+  --warn-bg: #fff3d6; --warn: #7a5200; --info-bg: #e8eefb; --mine: #fff6d6;
+  --red: #d50032;
+  --radius: 8px; --shadow: 0 1px 3px rgba(4, 30, 66, .12);
+  color-scheme: light;
+}
+body { font-family: "Figtree", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Helvetica Neue", Arial, sans-serif; background: var(--bg); }
+
+/* 導覽列：深藍底，頁籤像 NEWS / SCORES / SCHEDULE */
+.topbar { background: #041e42; border-bottom: 0; padding-bottom: 0; }
+.topbar-inner { min-height: 68px; }
+.brand h1 { font-size: 20px; font-weight: 800; letter-spacing: .01em; }
+.brand-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; background: #fff; border-radius: 6px; font-size: 24px; }
+.live { opacity: 1; color: #b9c7dc; }
+.topbar .btn { background: transparent; border: 1px solid #5d7aa6; border-radius: 999px; color: #fff; }
+.topbar .btn:hover { background: rgba(255, 255, 255, .12); }
+.viewtabs { padding-bottom: 0; gap: 4px; }
+.viewtab { background: transparent; color: #cdd8e8; border-radius: 0; font-weight: 700; font-size: 15px; border-bottom: 4px solid transparent; }
+.viewtab.on { background: transparent; color: #fff; border-bottom-color: #fff; }
+
+/* 卡片與按鈕 */
+.card, .table-wrap, .team-list, .center-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.btn { border-radius: 999px; font-weight: 700; border: 1px solid #b8c3d3; background: #fff; }
+.btn:hover { border-color: var(--brand-2); color: var(--brand-2); }
+.btn.primary { background: var(--brand-2); border-color: var(--brand-2); color: #fff; }
+.btn.primary:hover { background: #003aa3; border-color: #003aa3; color: #fff; filter: none; }
+.btn.danger { color: var(--bad); border-color: #e6a3b0; }
+.tab { border: 1px solid var(--line); border-radius: 999px; font-weight: 700; color: var(--sub); }
+.tab.on { background: var(--brand-2); border-color: var(--brand-2); color: #fff; }
+.subtabs { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0; gap: 0; }
+.subtab { border-radius: 0; border-bottom: 3px solid transparent; font-weight: 700; }
+.subtab.on { background: transparent; color: var(--brand); border-bottom-color: var(--brand-2); }
+.seg.on { background: var(--brand-2); color: #fff; box-shadow: none; }
+.format-pick { border-radius: 999px; }
+.seg { border-radius: 999px; }
+.chip, .count { background: var(--info-bg); color: var(--brand-2); }
+.status-badge { background: transparent; color: var(--sub); padding: 0; font-weight: 700; font-size: 12px; }
+.status-badge.completed { background: transparent; color: var(--sub); }
+.status-badge.playing, .mbadge.live { background: var(--red); color: #fff; padding: 1px 8px; }
+.status-badge.playing::before { content: "● "; }
+.progress-bar { background: var(--brand-2); }
+
+.round-title, .section-title, .bcol h4, .rules h3 { color: var(--brand); font-weight: 800; }
+.round-title { font-size: 18px; padding-bottom: 6px; border-bottom: 3px solid var(--brand-2); display: inline-block; margin-right: 100%; }
+
+/* 比分卡：像 MLB 頂部的比分條，名字和分數各一行 */
+.match { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 14px 12px; gap: 4px; }
+.match-top { order: 5; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.match.playing { border-color: var(--red); box-shadow: 0 0 0 1px var(--red), var(--shadow); }
+.match.mine { background: var(--mine); }
+button.match:hover { border-color: var(--brand-2); box-shadow: 0 0 0 1px var(--brand-2), var(--shadow); }
+.side { font-size: 17px; font-weight: 600; }
+.side .score, .score-total, .mline .pscore { font-weight: 800; font-variant-numeric: tabular-nums; }
+.side .score { font-size: 22px; border-left: 0; padding-left: 0; }
+.side.won { color: var(--text); font-weight: 800; }
+.side:not(.won) .name, .match:has(.side.won) .side:not(.won) .score { color: var(--sub); font-weight: 500; }
+.side.won .name::after { content: " ◀"; color: var(--brand-2); font-size: 11px; }
+.pt.w { color: var(--text); }
+.mbox { border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.mbox.bye, .mbox.pending { background: #f1f3f6; }
+.mbox.live { border-color: var(--red); }
+.mbox.clickable:hover { border-color: var(--brand-2); box-shadow: 0 0 0 1px var(--brand-2); }
+.mline.win { color: var(--text); }
+.mline.win .pscore { color: var(--brand-2); }
+.mline:not(.win) { color: var(--sub); }
+
+/* 表格：排名表，標題列深藍 */
+th { background: var(--brand); color: #fff; font-weight: 700; border-bottom: 0; }
+.matrix th.left { background: #fff; color: var(--text); }
+.rank { color: var(--brand); font-weight: 800; }
+.seed-no { background: var(--brand); border-radius: 6px; }
+.idx { background: var(--info-bg); color: var(--brand-2); }
+.seed-list li { background: #fff; border-radius: 8px; }
+.placings li { background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.placings li.mine { background: var(--mine); }
+tr.qualified td { background: var(--ok-bg); }
+
+.modal { border-radius: 12px; border-top: 6px solid var(--brand); }
+.score-total { color: var(--brand); }
+.pt-input { border-radius: 8px; }
+.banner.demo, .banner.warn { border-radius: 8px; }
+#toast { background: var(--brand); border-radius: 999px; }
+:focus-visible { outline-color: var(--brand-2); }

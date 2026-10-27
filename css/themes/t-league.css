@@ -1,0 +1,97 @@
+/* 風格 G「T聯賽 黑金」：參考日本 T.LEAGUE 官網——白色刊頭、黑底主體、金色細線與置中標題、白色方塊賽程卡。 */
+:root, :root:root {
+  --gold: #a57b2f; --gold-2: #c69b3e; --gold-soft: #e3c98a;
+  --bg: #000; --card: #141414; --text: #f2f2f2; --sub: #9b968c; --line: #3a3732;
+  --brand: #a57b2f; --brand-2: #c69b3e; --accent: #c69b3e;
+  --ok: #7fd9a5; --ok-bg: #12281d; --bad: #ff7a70; --bad-bg: #331714;
+  --warn-bg: #2d2410; --warn: #e3c98a; --info-bg: #1f1d19; --mine: #2d2410;
+  --radius: 0; --shadow: none;
+  color-scheme: dark;
+}
+body { font-family: "Open Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; background: linear-gradient(#000 60%, #1a1814); background-attachment: fixed; background-color: #000; }
+
+/* 刊頭：白底，字標置中 */
+.topbar { background: linear-gradient(#000, #14120e); color: #fff; border-bottom: 1px solid var(--gold); padding-bottom: 0; }
+.topbar-inner { min-height: 64px; position: relative; }
+.brand { gap: 8px; }
+.brand h1 { font-family: "Montserrat", "Noto Sans TC", sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .06em; color: #fff; }
+.brand-icon { font-size: 26px; }
+.live { color: var(--gold-soft); opacity: 1; }
+.topbar .btn { background: transparent; color: var(--gold-soft); border: 1px solid var(--gold); border-radius: 0; }
+.topbar .btn:hover { background: var(--gold); color: #fff; }
+.viewtabs { padding: 0; gap: 0; background: #000; border-radius: 0; }
+.viewtab { background: transparent; color: #bdb7ab; border-radius: 0; font-weight: 700; letter-spacing: .08em; border-bottom: 3px solid transparent; }
+.viewtab.on { background: transparent; color: var(--gold-2); border-bottom-color: var(--gold-2); }
+
+/* 區塊與標題：置中、下方短金線 */
+.card, .table-wrap, .team-list, .center-card { background: var(--card); border: 1px solid var(--line); border-top: 1px solid var(--gold); border-radius: 0; box-shadow: none; }
+.card h2, .card h3, .section-head h3, .round-title, .section-title, .rules h3, .bcol h4 { color: #fff; font-weight: 600; letter-spacing: .08em; }
+.round-title, .section-title { text-align: center; margin: 28px 0 18px; font-size: 18px; }
+.round-title::after, .section-title::after, .bcol h4::after { content: ""; display: block; width: 36px; height: 2px; background: var(--gold-2); margin: 8px auto 0; }
+.bcol h4 { text-align: center; font-size: 14px; }
+.rules h3 { color: var(--gold-soft); }
+
+.btn { border-radius: 0; background: transparent; color: #fff; border: 1px solid #77715f; font-weight: 700; letter-spacing: .04em; }
+.btn:hover { border-color: var(--gold-2); color: var(--gold-2); }
+.btn.primary { background: var(--gold); border-color: var(--gold); color: #fff; }
+.btn.primary:hover { background: var(--gold-2); border-color: var(--gold-2); color: #000; filter: none; }
+.btn.danger { color: var(--bad); border-color: #7a3a35; }
+.tab { background: transparent; border: 1px solid #4f4c47; border-radius: 0; color: #bdb7ab; letter-spacing: .06em; }
+.tab.on { background: var(--gold); border-color: var(--gold); color: #fff; }
+.subtabs { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0; gap: 0; }
+.subtab { border-radius: 0; color: #bdb7ab; border-bottom: 2px solid transparent; }
+.subtab.on { background: transparent; color: var(--gold-2); border-bottom-color: var(--gold-2); }
+.format-pick { background: transparent; border: 1px solid #4f4c47; border-radius: 0; }
+.seg { border-radius: 0; color: #bdb7ab; }
+.seg.on { background: var(--gold); color: #fff; box-shadow: none; }
+.chip, .count, .phase, .mbadge { border-radius: 0; background: transparent; color: var(--gold-soft); border: 1px solid var(--gold); }
+.phase.active, .chip.ok { color: var(--ok); border-color: var(--ok); background: transparent; }
+.phase.setup { color: var(--warn); border-color: var(--gold); background: transparent; }
+.progress { height: 3px; border-radius: 0; background: #2a2722; }
+.progress-bar { border-radius: 0; background: var(--gold-2); }
+
+/* 賽程卡：像官網的白色方塊 */
+.match, .mbox { --text: #111; --sub: #6b6458; --line: #d9d5cc; --ok: #1c7a4a; --mine: #fff3d2; background: #fff; color: #111; border: 0; border-bottom: 3px solid var(--gold-2); border-radius: 0; box-shadow: none; }
+.match { padding: 12px 14px; }
+.match.mine, .mbox.mine { background: #fff3d2; }
+.match.playing, .mbox.live { border-bottom-color: #d4202a; box-shadow: inset 0 0 0 2px #d4202a; }
+button.match:hover, .mbox.clickable:hover { background: #f6efe0; box-shadow: none; border-color: initial; border-bottom-color: var(--gold-2); }
+.status-badge { background: #111; color: #fff; border-radius: 0; }
+.status-badge.completed { background: #eee; color: #6b6458; }
+.status-badge.playing, .mbadge.live { background: #d4202a; color: #fff; }
+.side .score, .score-total, .mline .pscore { font-family: "Montserrat", "Open Sans", sans-serif; font-weight: 800; font-variant-numeric: tabular-nums; }
+.side .score { font-size: 22px; }
+.side.won, .mline.win { color: #111; font-weight: 800; }
+.side.won .score, .mline.win .pscore { color: var(--gold); }
+.side.won .name::after { content: " ★"; color: var(--gold-2); font-size: 12px; }
+.mbox.bye, .mbox.pending { background: #e9e6df; }
+.mgames span { background: #eee9dc; color: #111; }
+.mbadge { color: #6b6458; border-color: #b9b2a0; }
+.mbadge.live { color: #fff; border-color: #d4202a; }
+.pt.w { color: #111; }
+.score-total { color: var(--gold-2); font-size: 36px; }
+.mline + .mline { border-top: 1px solid #d9d5cc; }
+
+/* 表格 */
+th { background: #000; color: var(--gold-2); font-weight: 600; letter-spacing: .08em; border-bottom: 1px solid var(--gold); }
+td, th { border-bottom-color: #2a2722; }
+.matrix th.left { background: var(--card); color: #fff; }
+.rank { font-family: "Montserrat", sans-serif; color: var(--gold-2); font-weight: 800; }
+.seed-no { background: var(--gold); border-radius: 0; color: #fff; }
+.idx { background: transparent; border: 1px solid var(--gold); color: var(--gold-soft); border-radius: 0; }
+.seed-list li, .placings li { background: #1a1814; border: 1px solid var(--line); border-radius: 0; }
+.placings li.mine { background: var(--mine); }
+tr.qualified td { background: #1b2a20; }
+
+.modal { background: #141414; border: 1px solid var(--gold); border-radius: 0; box-shadow: 0 20px 60px rgba(0, 0, 0, .6); color: #f2f2f2; }
+.modal h2 { color: #fff; letter-spacing: .06em; }
+.backdrop { background: rgba(0, 0, 0, .8); }
+.pt-input { background: #000; border: 1px solid #77715f; border-radius: 0; color: #fff; font-family: "Montserrat", sans-serif; }
+input, select, textarea { background: #0b0b0b; border: 1px solid #4f4c47; border-radius: 0; }
+.rule-example, .banner { border-radius: 0; border-left: 3px solid var(--gold-2); background: var(--info-bg); }
+.banner.demo, .banner.warn { background: var(--warn-bg); color: var(--warn); }
+.banner.error { background: var(--bad-bg); color: var(--bad); }
+#toast { background: var(--gold); border-radius: 0; }
+#toast.error { background: #b3261e; }
+#toast.ok { background: #1c7a4a; }
+:focus-visible { outline-color: var(--gold-2); }
