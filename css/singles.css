@@ -173,3 +173,4 @@ tr.qualified td { background: color-mix(in srgb, var(--ok-bg) 70%, transparent);
 .grid-form { grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
 .grid-form > label { min-width: 0; }
 .grid-form select, .grid-form input { width: 100%; min-width: 0; max-width: 100%; }
+.brand-logo { width: 40px; height: 40px; flex: none; object-fit: contain; }

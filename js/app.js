@@ -55,7 +55,8 @@ const TITLE_SUGGESTIONS = ['選手', '種子選手', '隊長', '教練', '領隊
 
 // ---------------------------------------------------------------- 選手資料與頭像
 
-const AVATAR_COLORS = [['#bfe3cf', '#1f5a3d'], ['#f6cdd6', '#7a2e45'], ['#c9dcf7', '#2b4a80'], ['#f6e3a8', '#7a5a12'], ['#ddd0f3', '#4b3a7a'], ['#f8d3b8', '#7a3f17'], ['#c6e8e4', '#1f5a55']];
+// 沒有照片時的頭像底色：取自企業識別色（藍、黃、灰）的淺色階
+const AVATAR_COLORS = [['#d3e3f6', '#1f4f86'], ['#ffeb99', '#5c4800'], ['#e2e2e2', '#444242'], ['#bfe0f5', '#1d5680'], ['#ffe066', '#523f00'], ['#cdd9e8', '#2e4a6b'], ['#f1f1f1', '#666464']];
 const avatarColor = (name) => AVATAR_COLORS[[...String(name)].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 // 有照片就顯示照片，沒有就顯示姓名最後兩個字（中文名常用名字，不用姓）
 const avatar = (p, size = 'sm') => {
@@ -251,7 +252,7 @@ function renderHeader() {
     <header class="topbar">
       <div class="container topbar-inner">
         <div class="brand">
-          <span class="brand-icon" aria-hidden="true">🏓</span>
+          <img class="brand-logo" src="img/logo-glow-96.png" srcset="img/logo-glow-96.png 1x, img/logo-glow-192.png 2x" width="46" height="46" alt="中龍鋼鐵">
           <div>
             <h1>${esc(state.settings.title)}</h1>
             ${state.live
