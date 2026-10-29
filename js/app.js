@@ -1,5 +1,5 @@
 import { ORGANIZER_EMAIL } from './config.js';
-import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029c';
+import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029h';
 import {
   DIVISIONS, FORMATS, FINAL_FORMATS, BEST_OF, GROUP_LABELS,
   gameWinner, isStandardGame, matchOutcome, nextPow2,
@@ -7,6 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js';
 import { exportExcel, lineReport } from './export.js';
+import { avatar as avatarOf, titleChip as titleChipOf, openPersonEditor } from './people.js';
 
 const demo = new URLSearchParams(location.search).has('demo');
 const store = {
@@ -51,23 +52,14 @@ const finalOptions = (cfg) => ({
   third: cfg.final_third ?? cfg.final_format === 'single',
 });
 const PLAYOFF_LABEL = { PF: '冠軍賽', PT: '季軍賽' };
-const TITLE_SUGGESTIONS = ['選手', '種子選手', '隊長', '教練', '領隊', '裁判'];
 
 // ---------------------------------------------------------------- 選手資料與頭像
+// 單位、頭銜、照片存在共用的「選手資料庫」（people 資料表，以姓名對應）。
+// 載入資料時會把資料庫的內容併進每位選手，所以下面的畫面程式可以直接用 p.unit / p.title / p.photo_url。
 
-// 沒有照片時的頭像底色：取自企業識別色（藍、黃、灰）的淺色階
-const AVATAR_COLORS = [['#d3e3f6', '#1f4f86'], ['#ffeb99', '#5c4800'], ['#e2e2e2', '#444242'], ['#bfe0f5', '#1d5680'], ['#ffe066', '#523f00'], ['#cdd9e8', '#2e4a6b'], ['#f1f1f1', '#666464']];
-const avatarColor = (name) => AVATAR_COLORS[[...String(name)].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
-// 有照片就顯示照片，沒有就顯示姓名最後兩個字（中文名常用名字，不用姓）
-const avatar = (p, size = 'sm') => {
-  if (!p) return `<span class="av ${size}" aria-hidden="true">?</span>`;
-  if (p.photo_url) return `<span class="av ${size}"><img src="${esc(p.photo_url)}" alt="" loading="lazy"></span>`;
-  const [bg, fg] = avatarColor(p.name);
-  const text = [...p.name].slice(-2).join('');
-  return `<span class="av ${size}" style="background:${bg};color:${fg}" aria-hidden="true">${esc(text)}</span>`;
-};
+const avatar = (p, size = 'sm') => avatarOf(p, size);
 const subline = (p) => [p?.unit, p?.title].filter(Boolean).map(esc).join(' · ');
-const titleChip = (p) => (p?.title ? `<span class="ttl ${p.title === '教練' || p.title === '領隊' ? 'coach' : /種子|隊長/.test(p.title) ? 'seed' : ''}">${esc(p.title)}</span>` : '');
+const titleChip = (p) => titleChipOf(p?.title);
 
 // 這位選手在整個組別的戰績（勝敗、局數、得失分、每場結果）
 function playerRecord(v, id) {
@@ -222,7 +214,13 @@ const scheduleReload = () => { clearTimeout(reloadTimer); reloadTimer = setTimeo
 
 async function reload() {
   try {
-    Object.assign(state, await backend.load(), { loaded: true, error: null });
+    const data = await backend.load();
+    // 選手資料庫（以姓名對應）優先；沒有資料庫資料時沿用 sg_players 自己的舊欄位
+    data.players = data.players.map((p) => {
+      const prof = data.people?.[p.name];
+      return prof ? { ...p, unit: prof.unit, title: prof.title, photo_url: prof.photo_url } : p;
+    });
+    Object.assign(state, data, { loaded: true, error: null });
   } catch (err) {
     console.error(err);
     state.error = err.message || '資料讀取失敗';
@@ -783,6 +781,7 @@ function renderAdmin() {
 }
 
 function render() {
+  document.dispatchEvent(new CustomEvent('site-organizer', { detail: isOrganizer() })); // 只有主辦看得到共用導覽列
   if (!state.loaded) {
     app.innerHTML = state.error
       ? `<div class="center-card"><h2>無法讀取資料</h2><p>${esc(state.error)}</p><button class="btn primary" data-action="retry">重新載入</button></div>`
@@ -985,75 +984,19 @@ function openProfileModal(id) {
   });
 }
 
-// 照片：置中裁成 3:4、縮到 480×640，轉成 JPEG（手機相機原圖動輒數 MB）
-async function resizePhoto(file) {
-  const bitmap = await createImageBitmap(file);
-  const W = 480, H = 640;
-  const scale = Math.max(W / bitmap.width, H / bitmap.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-  ctx.drawImage(bitmap, (W - bitmap.width * scale) / 2, (H - bitmap.height * scale) / 2, bitmap.width * scale, bitmap.height * scale);
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('照片處理失敗'))), 'image/jpeg', 0.85));
-}
-
+// 編輯選手資料（單位、頭銜、照片）：存到共用的「選手資料庫」，同名選手在三個系統共用
 function openEditPlayerModal(id) {
   const p = playerById(id);
   if (!p) return;
-  openModal(`
-    <h2>編輯選手資料</h2>
-    <form>
-      <div class="photo-edit">
-        <div class="photo-preview" id="photo-preview">${avatar(p, 'big')}</div>
-        <div class="photo-ctl">
-          <label class="btn small file-btn">選擇照片<input name="photo" type="file" accept="image/*" hidden></label>
-          <button type="button" class="btn small danger" data-remove-photo ${p.photo_url ? '' : 'hidden'}>移除照片</button>
-          <p class="note">照片會自動置中裁成直式 3:4，並縮小後上傳。</p>
-        </div>
-      </div>
-      <label>姓名<input name="name" maxlength="20" required value="${esc(p.name)}"></label>
-      <label>單位<input name="unit" maxlength="40" placeholder="例：新北市桌球隊" value="${esc(p.unit || '')}"></label>
-      <label>頭銜<input name="title" maxlength="20" list="title-list" placeholder="例：種子選手" value="${esc(p.title || '')}"></label>
-      <datalist id="title-list">${TITLE_SUGGESTIONS.map((t) => `<option value="${t}">`).join('')}</datalist>
-      <p class="error" hidden></p>
-      <div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary">儲存</button></div>
-    </form>`,
-  (modal, close) => {
-    const form = modal.querySelector('form');
-    const preview = modal.querySelector('#photo-preview');
-    const removeBtn = modal.querySelector('[data-remove-photo]');
-    const errorEl = form.querySelector('.error');
-    let newBlob = null;
-    let removed = false;
-    form.photo.addEventListener('change', async () => {
-      const file = form.photo.files[0];
-      if (!file) return;
-      try {
-        newBlob = await resizePhoto(file);
-        removed = false;
-        preview.innerHTML = `<span class="av big"><img src="${URL.createObjectURL(newBlob)}" alt=""></span>`;
-        removeBtn.hidden = false;
-      } catch { errorEl.textContent = '這個檔案無法當作照片，請換一張圖片'; errorEl.hidden = false; }
-    });
-    removeBtn.addEventListener('click', () => {
-      newBlob = null; removed = true; form.photo.value = '';
-      preview.innerHTML = avatar({ ...p, photo_url: null }, 'big');
-      removeBtn.hidden = true;
-    });
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errorEl.hidden = true;
-      const name = form.name.value.trim();
-      if (!name) return;
-      const ok = await run(async () => {
-        const patch = { name, unit: form.unit.value.trim() || null, title: form.title.value.trim() || null };
-        if (newBlob) patch.photo_url = await backend.uploadPhoto(p.id, newBlob);
-        else if (removed) patch.photo_url = null;
-        await backend.updatePlayer(p.id, patch);
-      }, '選手資料已儲存');
-      if (ok) close();
-    });
+  openPersonEditor({
+    openModal,
+    person: p,
+    onSave: ({ unit, title, blob, removed }) => run(async () => {
+      let photo_url = p.photo_url || null;
+      if (blob) photo_url = await backend.uploadPhoto(blob);
+      else if (removed) photo_url = null;
+      await backend.savePerson(p.name, { unit, title, photo_url });
+    }, '選手資料已儲存'),
   });
 }
 

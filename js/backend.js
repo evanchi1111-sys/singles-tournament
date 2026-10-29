@@ -1,4 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ORGANIZER_EMAIL } from './config.js';
+import { peopleApi, demoPeopleApi } from './people.js';
 
 export const DEFAULT_DIVISION = {
   format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null,
@@ -50,25 +51,28 @@ async function createSupabaseBackend() {
     return rows;
   };
   const now = () => new Date().toISOString();
+  const people = peopleApi(sb);
 
   return {
     async load() {
-      const [settings, divisions, players, matches] = await Promise.all([
+      const [settings, divisions, players, matches, peopleMap] = await Promise.all([
         sb.from('sg_settings').select('*').eq('id', 1).maybeSingle(),
         sb.from('sg_divisions').select('*'),
         sb.from('sg_players').select('*').order('seed').order('created_at'),
         sb.from('sg_matches').select('*'),
+        people.load(),
       ]);
       return {
         settings: check(settings) || { title: '桌球單打賽' },
         divisions: toDivisionMap(check(divisions)),
         players: check(players),
         matches: check(matches),
+        people: peopleMap,
       };
     },
     subscribe(onChange, onStatus = () => {}) {
       const channel = sb.channel('singles');
-      for (const table of ['sg_settings', 'sg_divisions', 'sg_players', 'sg_matches']) {
+      for (const table of ['sg_settings', 'sg_divisions', 'sg_players', 'sg_matches', 'people']) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table }, onChange);
       }
       channel.subscribe((status) => onStatus(status));
@@ -111,17 +115,9 @@ async function createSupabaseBackend() {
     async deletePlayer(id) {
       mustAffect(await sb.from('sg_players').delete().eq('id', id).select());
     },
-    // 更新單一選手的基本資料（姓名、單位、頭銜、照片）
-    async updatePlayer(id, patch) {
-      mustAffect(await sb.from('sg_players').update(patch).eq('id', id).select());
-    },
-    // 上傳選手照片（已在瀏覽器縮小的 JPEG），回傳公開網址
-    async uploadPhoto(playerId, blob) {
-      const path = `${playerId}-${Date.now()}.jpg`;
-      const { error } = await sb.storage.from('sg-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
-      if (error) throw friendlyError(error);
-      return sb.storage.from('sg-photos').getPublicUrl(path).data.publicUrl;
-    },
+    // 選手資料庫（人員基本資料：單位、頭銜、照片），三個系統共用
+    async savePerson(name, patch) { await people.save(name, patch); },
+    uploadPhoto(blob) { return people.upload(blob); },
     async createMatches(rows) {
       if (rows.length) check(await sb.from('sg_matches').insert(rows));
     },
@@ -149,6 +145,7 @@ function createDemoBackend() {
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
   const DEMO_PASSWORD = 'demo1234';
   const t0 = Date.now();
+  const peopleDemo = demoPeopleApi();
   const db = {
     settings: { title: '桌球單打賽' },
     divisions: toDivisionMap([]),
@@ -179,7 +176,7 @@ function createDemoBackend() {
   return {
     isDemo: true,
     demoPassword: DEMO_PASSWORD,
-    async load() { return clone(db); },
+    async load() { return { ...clone(db), people: await peopleDemo.load() }; },
     subscribe(onChange, onStatus = () => {}) {
       dataListeners.add(onChange);
       setTimeout(() => onStatus('SUBSCRIBED'), 0);
@@ -210,22 +207,9 @@ function createDemoBackend() {
       emit();
     },
     async deletePlayer(id) { requireOrganizer(); db.players = db.players.filter((p) => p.id !== id); emit(); },
-    async updatePlayer(id, patch) {
-      requireOrganizer();
-      const p = db.players.find((x) => x.id === id);
-      if (patch.name && db.players.some((x) => x.id !== id && x.division === p.division && x.name === patch.name)) throw new Error('名稱重複，請換一個');
-      Object.assign(p, patch);
-      emit();
-    },
-    // 示範模式：照片直接轉成網址字串，存在這個分頁的記憶體裡
-    async uploadPhoto(_playerId, blob) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('照片讀取失敗'));
-        reader.readAsDataURL(blob);
-      });
-    },
+    // 選手資料庫（示範模式：只存在記憶體）
+    async savePerson(name, patch) { requireOrganizer(); await peopleDemo.save(name, patch); emit(); },
+    uploadPhoto(blob) { return peopleDemo.upload(blob); },
     async createMatches(rows) {
       requireOrganizer();
       rows.forEach((r) => db.matches.push({ id: uid(), games: [], p1_id: null, p2_id: null, grp: null, ...r }));

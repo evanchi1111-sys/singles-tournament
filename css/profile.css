@@ -1,0 +1,81 @@
+/* 選手資料（頭像、選手卡、檔案視窗、照片編輯）與共用導覽列的樣式。
+   顏色全部取自主題變數，沒有主題時使用括號裡的預設值。四個專案各放一份相同的檔案。 */
+
+/* ---------- 共用導覽列 ---------- */
+.sitenav { background: #14284a; position: relative; z-index: 30; }
+.sitenav-inner { display: flex; gap: 4px; width: min(1180px, 100% - 24px); margin: 0 auto; overflow-x: auto; scrollbar-width: none; }
+.sitenav a { flex: none; padding: 9px 14px; color: #c9d6ea; font-size: 13px; font-weight: 700; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
+.sitenav a:hover { color: #fff; }
+.sitenav a.on { color: #FBCE00; border-bottom-color: #FBCE00; }
+.sitenav a:focus-visible { outline: 2px solid #FBCE00; outline-offset: -2px; }
+
+/* ---------- 頭像 ---------- */
+.av { display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%; background: var(--info-bg, #e3edf8); color: var(--sub, #666464); font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--line, #d5e0ec); }
+.av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av.xs { width: 22px; height: 22px; font-size: 9px; box-shadow: 0 0 0 1.5px #fff; }
+.av.sm { width: 40px; height: 40px; font-size: 13px; }
+.av.cover { width: 100%; height: 100%; border-radius: 0; font-size: 34px; box-shadow: none; }
+.av.big { width: 120px; height: 120px; font-size: 36px; border: 4px solid #fff; box-shadow: 0 8px 20px rgba(25, 50, 90, .2); }
+.pair { display: inline-flex; flex: none; }
+.pair .av + .av { margin-left: -10px; }
+.pair .av.xs + .av.xs { margin-left: -6px; }
+
+.ttl { display: inline-block; width: fit-content; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #dbe8f7; color: #1f5190; }
+.ttl.coach { background: #ececec; color: #4a4848; }
+.ttl.seed { background: #fff1a8; color: #5c4800; }
+.ttl.plain { background: #f1f1f1; color: #666464; }
+
+.who-btn, .person, .pcard { font: inherit; color: inherit; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
+.who-btn { display: inline-flex; align-items: center; gap: 10px; }
+.who-tx { display: grid; min-width: 0; }
+.who-sub { display: block; font-size: 12px; font-weight: 500; color: var(--sub, #666464); }
+.side .name, .mline .pname { display: flex; align-items: center; gap: 6px; }
+
+/* ---------- 隊伍卡（雙打賽名單） ---------- */
+.team-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.tcard { background: #fff; border-radius: 18px; box-shadow: 0 3px 12px rgba(25, 50, 90, .1); overflow: hidden; display: grid; }
+.tcard.mine { background: var(--mine, #fff4bf); }
+.tcard-top { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; }
+.tcard-people { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 12px 12px; }
+.person { display: grid; gap: 2px; align-content: start; }
+.person-photo { aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden; display: block; margin-bottom: 6px; box-shadow: 0 2px 8px rgba(25, 50, 90, .15); }
+.person b { font-size: 15px; font-weight: 800; }
+.person small { color: var(--sub, #666464); font-size: 12px; }
+.person .ttl { margin-top: 3px; }
+
+/* ---------- 選手卡（團體賽、選手資料庫） ---------- */
+.player-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 10px; }
+@media (min-width: 560px) { .player-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 960px) { .player-grid { grid-template-columns: repeat(4, 1fr); gap: 18px; } }
+.pcard { display: grid; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 4px 12px rgba(25, 50, 90, .1); }
+.pcard-photo { aspect-ratio: 3 / 4; display: block; overflow: hidden; }
+.pcard-tx { display: grid; gap: 2px; padding: 10px 12px 12px; }
+.pcard-tx b { font-size: 16px; font-weight: 800; }
+.pcard-tx small { color: var(--sub, #666464); }
+.pcard-tx .ttl { margin-top: 3px; }
+@media (hover: hover) { .pcard, .person-photo { transition: transform .12s, box-shadow .12s; } .pcard:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(25, 50, 90, .16); } }
+.who-btn:focus-visible, .person:focus-visible, .pcard:focus-visible { outline: 3px solid #3071B9; outline-offset: 2px; }
+
+/* ---------- 選手檔案視窗 ---------- */
+.profile { display: grid; justify-items: center; gap: 4px; text-align: center; position: relative; }
+.profile h2 { margin: 6px 0 0; font-size: 24px; }
+.profile p { margin: 0; }
+.profile-unit { color: var(--sub, #666464); font-weight: 600; }
+.profile-x { position: absolute; top: -6px; right: -6px; width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 15px; color: var(--sub, #666464); }
+.profile .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; margin-top: 10px; }
+.profile .stats div { background: #fff; border-radius: 16px; padding: 10px 4px; }
+.profile .stats b { display: block; font-size: 22px; }
+.profile .stats span { font-size: 12px; color: var(--sub, #666464); }
+.profile-h { margin: 14px 0 4px; align-self: start; font-size: 15px; }
+.profile-matches { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; max-height: 220px; overflow-y: auto; }
+.profile-matches li { display: grid; grid-template-columns: 1fr auto 3.2em; gap: 8px; text-align: left; padding: 8px 12px; border-radius: 14px; background: #fff; font-weight: 600; }
+.profile-matches em { font-style: normal; font-weight: 800; text-align: right; }
+.profile-matches .w em { color: #0f7a43; } .profile-matches .l em { color: #c4253b; } .profile-matches .live em { color: #1f5190; }
+.profile .modal-actions { width: 100%; margin-top: 10px; }
+.profile-people { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; margin-top: 8px; }
+
+/* ---------- 照片編輯 ---------- */
+.photo-edit { display: flex; gap: 14px; align-items: center; }
+.photo-ctl { display: grid; gap: 6px; justify-items: start; }
+.file-btn { cursor: pointer; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
