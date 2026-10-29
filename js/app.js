@@ -247,6 +247,10 @@ app.addEventListener('focusout', () => {
 
 const emptyState = (text) => `<div class="empty"><span aria-hidden="true">🏓</span><p>${esc(text)}</p></div>`;
 
+// 網站標題前面固定加上公司名；主辦若已在標題裡寫了「中龍鋼鐵」就不重複加
+const COMPANY = '中龍鋼鐵';
+const siteTitle = () => (state.settings.title.includes(COMPANY) ? state.settings.title : `${COMPANY} ${state.settings.title}`);
+
 function renderHeader() {
   return `
     <header class="topbar">
@@ -254,7 +258,7 @@ function renderHeader() {
         <div class="brand">
           <img class="brand-logo" src="img/logo-glow-96.png" srcset="img/logo-glow-96.png 1x, img/logo-glow-192.png 2x" width="46" height="46" alt="中龍鋼鐵">
           <div>
-            <h1>${esc(state.settings.title)}</h1>
+            <h1>${esc(siteTitle())}</h1>
             ${state.live
               ? `<p class="live"><span class="dot" aria-hidden="true"></span>即時更新中</p>`
               : `<p class="live off"><span class="dot" aria-hidden="true"></span>重新連線中，每 15 秒自動更新</p>`}
@@ -785,6 +789,7 @@ function render() {
       : `<div class="center-card"><div class="spinner" aria-hidden="true"></div><p>載入中…</p></div>`;
     return;
   }
+  document.title = siteTitle();
   app.innerHTML = `
     ${renderHeader()}
     <main class="container view-${state.view}">
