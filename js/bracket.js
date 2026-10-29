@@ -10,6 +10,14 @@ export const GROUP_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 // ---------------------------------------------------------------- 比分
 
+// 棄權：用一個特殊的「局」記錄，棄權方的分數為 -1，例如 [-1, 0] ＝ 選手一棄權、選手二直接獲勝
+export const WALKOVER = { 1: [-1, 0], 2: [0, -1] };
+export const isWalkover = (g) => Array.isArray(g) && (g[0] < 0 || g[1] < 0);
+// 這場比賽誰棄權：1＝選手一、2＝選手二、0＝沒有人棄權
+export const walkoverSide = (games) => {
+  const g = (games || []).find(isWalkover);
+  return g ? (g[0] < 0 ? 1 : 2) : 0;
+};
 export const gameWinner = (g) => (Array.isArray(g) && g[0] !== g[1] ? (g[0] > g[1] ? 1 : 2) : 0);
 export const isStandardGame = (a, b) => {
   const hi = Math.max(a, b);
@@ -17,6 +25,8 @@ export const isStandardGame = (a, b) => {
   return hi === 11 ? lo <= 9 : hi > 11 && hi - lo === 2;
 };
 export function matchOutcome(games, bestOf) {
+  const wo = walkoverSide(games);
+  if (wo) return { w1: 0, w2: 0, winnerSide: wo === 1 ? 2 : 1, walkover: wo };
   const need = Math.ceil(Number(bestOf) / 2);
   let w1 = 0;
   let w2 = 0;
@@ -258,6 +268,7 @@ export function standings(ids, results, drawOf = () => null) {
       if (r.winner === id) t.mw++;
       else t.ml++;
       for (const g of r.games) {
+        if (isWalkover(g)) continue; // 棄權只算勝負，不計局數與得失分
         if (g[side] > g[1 - side]) t.gw++;
         else t.gl++;
         t.pw += Number(g[side]) || 0;
@@ -343,6 +354,17 @@ export function standings(ids, results, drawOf = () => null) {
     else ordered.push(...group(g));
   }
   ordered.forEach((r, i) => { r.rank = i + 1; });
+  // 抽籤由主辦單位在現場進行、人工填入順位；系統只負責提示。
+  // 順位要是 1～同分人數、且彼此不重複，否則視為「還沒抽完」（drawBad）
+  const clusters = new Map();
+  for (const r of ordered) if (r.drawTied) clusters.set(r.tieGroup, [...(clusters.get(r.tieGroup) || []), r]);
+  for (const list of clusters.values()) {
+    for (const r of list) {
+      r.tieSize = list.length;
+      r.drawBad = r.draw == null || r.draw < 1 || r.draw > list.length || list.filter((x) => x.draw === r.draw).length > 1;
+      r.drawDup = r.draw != null && list.filter((x) => x.draw === r.draw).length > 1;
+    }
+  }
   return ordered;
 }
 

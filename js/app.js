@@ -2,10 +2,10 @@ import { ORGANIZER_EMAIL } from './config.js';
 import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029q';
 import {
   DIVISIONS, FORMATS, FINAL_FORMATS, BEST_OF, GROUP_LABELS,
-  gameWinner, isStandardGame, matchOutcome, nextPow2,
+  gameWinner, isStandardGame, matchOutcome, nextPow2, WALKOVER, isWalkover, walkoverSide,
   buildSingle, buildDouble, buildGroups, buildSuper, knockoutSeeds,
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
-} from './bracket.js';
+} from './bracket.js?v=20261029s';
 import { exportExcel, lineReport } from './export.js';
 import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js';
 
@@ -72,7 +72,7 @@ function playerRecord(v, id) {
       const out = matchOutcome(r.match.games, bestOfFor(v.cfg, r.match.stage));
       const [gw, gl] = mine === 0 ? [out.w1, out.w2] : [out.w2, out.w1];
       rec.gamesWon += gw; rec.gamesLost += gl;
-      for (const g of r.match.games) { rec.pointsWon += g[mine]; rec.pointsLost += g[1 - mine]; }
+      for (const g of r.match.games) { if (!isWalkover(g)) { rec.pointsWon += g[mine]; rec.pointsLost += g[1 - mine]; } }
       const opp = mine === 0 ? r.p2 : r.p1;
       const done = r.state === 'done';
       if (done) { if (r.winner === id) rec.wins++; else rec.losses++; }
@@ -82,10 +82,11 @@ function playerRecord(v, id) {
   return rec;
 }
 
-// 戰績榜：依勝場、局差、分差排序（只列出已經打過比賽的選手）
+// 戰績榜：名次已決出的選手先照官方名次排，其餘依勝場、局差、分差排序（只列出已經打過比賽的選手）
 function leaderboardRows(v) {
+  const placeOf = new Map((v.placings || []).map((p) => [p.id, p.place]));
   return v.players.map((p) => ({ p, ...playerRecord(v, p.id) })).filter((r) => r.matches.length)
-    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || (b.gamesWon - b.gamesLost) - (a.gamesWon - a.gamesLost) || (b.pointsWon - b.pointsLost) - (a.pointsWon - a.pointsLost) || a.p.seed - b.p.seed);
+    .sort((a, b) => (placeOf.get(a.p.id) ?? 99) - (placeOf.get(b.p.id) ?? 99) || b.wins - a.wins || a.losses - b.losses || (b.gamesWon - b.gamesLost) - (a.gamesWon - a.gamesLost) || (b.pointsWon - b.pointsLost) - (a.pointsWon - a.pointsLost) || a.p.seed - b.p.seed);
 }
 
 let toastTimer;
@@ -146,7 +147,7 @@ function divisionView(div) {
     // 單循環賽：全部選手在同一組、沒有總決賽；打完後名次直接取自排名表（前三名同分還沒抽籤時，先不公布名次）
     if (cfg.format === 'roundrobin') {
       const g = v.groups[0];
-      v.rrNeedDraw = !!g && g.done && g.rows.some((r) => r.drawTied && r.draw == null && r.rank <= 3);
+      v.rrNeedDraw = !!g && g.done && g.rows.some((r) => r.drawTied && r.drawBad && r.rank <= 3);
       v.placings = g && g.done && !v.rrNeedDraw ? g.rows.map((r) => ({ place: r.rank, id: r.id })) : [];
     }
     // 有「需抽籤但還沒抽」的同分會影響總決賽時，先不能產生總決賽：
@@ -161,7 +162,7 @@ function divisionView(div) {
         clusters.get(r.tieGroup).push(r);
       }
       return [...clusters.values()].some((c) => {
-        if (!c.some((r) => r.draw == null)) return false;
+        if (!c.some((r) => r.drawBad)) return false;
         const inside = c.some((r) => r.rank <= k);
         const outside = c.some((r) => r.rank > k);
         return (inside && outside) || (inside && cfg.final_format === 'single');
@@ -188,7 +189,7 @@ function divisionView(div) {
       const inBlock = (ranks) => (v.plan.champ && ranks.every((r) => r <= 2)) || (v.plan.third && ranks.every((r) => r >= 3 && r <= 4));
       const clusters = new Map();
       for (const r of v.superRows) if (r.drawTied) clusters.set(r.tieGroup, [...(clusters.get(r.tieGroup) || []), r]);
-      v.superDrawNeeded = [...clusters.values()].filter((c) => c.some((r) => r.draw == null) && !inBlock(c.map((r) => r.rank)));
+      v.superDrawNeeded = [...clusters.values()].filter((c) => c.some((r) => r.drawBad) && !inBlock(c.map((r) => r.rank)));
       v.superAwaitingDraw = v.superDone && v.superDrawNeeded.length > 0;
       v.canMakePlayoffs = v.hasPlayoffs && v.superDone && !v.superAwaitingDraw && !v.playoffs.length;
       const playoffDone = v.playoffs.length > 0 && v.playoffs.every((m) => v.finalRes.get(m.code).state === 'done');
@@ -298,13 +299,14 @@ function matchBox(info, { label = '', admin = false, stage }) {
   const line = (pid, isBye, side) => {
     const won = info.state === 'done' && info.winner === pid;
     const text = pid ? esc(nameOf(pid)) : isBye ? '<i>輪空</i>' : '<i>待定</i>';
-    const score = info.state === 'done' || info.state === 'live' ? (side === 1 ? out.w1 : out.w2) : '';
+    const score = out.walkover ? (out.walkover === side ? '棄權' : '勝') : info.state === 'done' || info.state === 'live' ? (side === 1 ? out.w1 : out.w2) : '';
     return `<div class="mline ${won ? 'win' : ''} ${pid && pid === me ? 'me' : ''}"><span class="pname">${pid ? avatar(playerById(pid), 'xs') : ''}<span>${text}</span></span><span class="pscore">${score}</span></div>`;
   };
   const bye1 = info.bye1 || (info.state === 'bye' && !info.p1);
   const bye2 = info.bye2 || (info.state === 'bye' && !info.p2);
   const clickable = admin && info.p1 && info.p2 && info.state !== 'bye';
-  const games = (info.state === 'done' || info.state === 'live') && m.games.length
+  const games = out.walkover ? '<div class="mgames"><span class="g2">棄權判勝</span></div>'
+    : (info.state === 'done' || info.state === 'live') && m.games.length
     ? `<div class="mgames">${m.games.map((g) => `<span class="${gameWinner(g) === 1 ? 'g1' : 'g2'}">${g[0]}:${g[1]}</span>`).join('')}</div>` : '';
   const badge = { done: '', live: '<span class="mbadge live">進行中</span>', ready: '', pending: '', bye: '<span class="mbadge">輪空晉級</span>' }[info.state] || '';
   const tag = clickable ? 'button' : 'div';
@@ -358,19 +360,19 @@ function renderKnockout(res, size, format, { admin, stage }) {
 
 // complete = 這個階段的比賽都打完了；還沒打完時同分只是暫時的，不需要抽籤
 function standingsTable(rows, { qualify = 0, admin = false, drawField, complete = true }) {
-  const needDraw = complete && rows.some((r) => r.drawTied && r.draw == null);
+  const needDraw = complete && rows.some((r) => r.drawTied && r.drawBad);
   rows = rows.map((r) => (complete || !r.drawTied ? r : { ...r, drawTied: false, basis: '戰績相同（暫定）' }));
   return `
-    ${needDraw && admin ? `<div class="banner warn">有選手戰績完全相同，請抽籤後在「抽籤」欄填入順位。</div>` : ''}
+    ${needDraw && admin ? `<div class="banner warn">有選手戰績完全相同，請由主辦單位現場抽籤，再在「抽籤」欄填入順位（1～同分人數，不可重複）。</div>` : ''}
     <div class="table-wrap">
       <table class="rank-table">
         <thead><tr><th>名次</th><th class="left">選手</th><th>勝</th><th>敗</th><th>局數</th><th class="hide-sm">得失分</th><th class="left hide-sm">判定依據</th></tr></thead>
         <tbody>
           ${rows.map((r) => {
-            const basis = r.drawTied && r.draw == null ? `${r.basis}（未抽籤）` : r.basis;
+            const basis = r.drawTied && r.drawBad ? `${r.basis}（${r.drawDup ? '順位重複' : '未抽籤'}）` : r.basis;
             const draw = r.drawTied && admin
               ? `<label class="draw">抽籤 <select data-change="draw" data-field="${drawField}" data-id="${r.id}" aria-label="${esc(nameOf(r.id))} 抽籤順位">
-                   <option value="">—</option>${rows.map((_, i) => `<option value="${i + 1}" ${r.draw === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}
+                   <option value="">—</option>${Array.from({ length: r.tieSize }, (_, i) => `<option value="${i + 1}" ${r.draw === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}
                  </select></label>` : '';
             return `<tr class="${r.id === state.me ? 'mine' : ''} ${complete && qualify && r.rank <= qualify && r.played ? 'qualified' : ''}">
               <td class="rank">${r.rank}</td>
@@ -429,7 +431,7 @@ function leaderboardCard(v) {
             ${pill(r)}
           </button>
         </li>`).join('')}</ol>` : ''}
-      <p class="note">依勝場、局數差、得失分排序；點選手可看完整檔案。</p>
+      <p class="note">${v.placings?.length ? '名次決出後，前幾名依官方名次排列，其餘' : ''}依勝場、局數差、得失分排序；點選手可看完整檔案。</p>
     </section>`;
 }
 
@@ -773,6 +775,11 @@ function renderAdmin() {
         <h3>${DIVISIONS[v.div]} 賽程管理</h3>
         <p class="note">點選對戰方框即可登錄或修改比分。</p>
         ${finalSettings}
+        <div class="inline-form">
+          <select id="wd-player" aria-label="退賽的選手"><option value="">選手退賽…</option>${v.players.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+          <button class="btn" data-action="withdraw" ${busy}>判定退賽</button>
+        </div>
+        <p class="note">選手受傷或臨時離場時使用：他還沒打的對戰會判對手直接獲勝（棄權只計勝負，不計局數與得失分）。也可以在單場比分視窗按「棄權」。</p>
         ${groupHint}
         <div class="actions wrap">${actions.join('')}</div>
       </section>
@@ -839,7 +846,8 @@ function openScoreModal(div, stage, code) {
   const need = Math.ceil(bestOf / 2);
   const n1 = nameOf(info.p1);
   const n2 = nameOf(info.p2);
-  const saved = info.stale ? [] : info.match.games;
+  const woNow = info.stale ? 0 : walkoverSide(info.match.games);
+  const saved = info.stale || woNow ? [] : info.match.games;
   const cell = (i, side) => `<input class="pt-input" type="number" inputmode="numeric" min="0" max="99" data-game="${i}" data-side="${side}" value="${saved[i] ? saved[i][side] : ''}" aria-label="第 ${i + 1} 局 ${esc(side ? n2 : n1)} 得分">`;
   const label = info.match.grp ? `${info.match.grp} 組 第 ${info.match.round} 輪`
     : /^S-/.test(code) ? '超級循環賽' : PLAYOFF_LABEL[code] || roundLabel(code, v.size);
@@ -852,7 +860,11 @@ function openScoreModal(div, stage, code) {
        ${Array.from({ length: bestOf }, (_, i) => `
          <div class="game-row" data-row="${i}"><span class="game-label">第 ${i + 1} 局</span>${cell(i, 0)}<span class="colon">:</span>${cell(i, 1)}<span class="row-note"></span></div>`).join('')}
      </div>
-     <p class="score-result"></p>
+     <p class="score-result">${woNow ? `目前判定：<b>${esc(woNow === 1 ? n1 : n2)}</b> 棄權，${esc(woNow === 1 ? n2 : n1)} 直接獲勝。` : ''}</p>
+     <div class="modal-actions wo-actions">
+       <button type="button" class="btn" data-wo="1">${esc(n1)} 棄權</button>
+       <button type="button" class="btn" data-wo="2">${esc(n2)} 棄權</button>
+     </div>
      <div class="modal-actions">
        <button type="button" class="btn" data-clear>清除比分</button>
        <button type="button" class="btn" data-close>取消</button>
@@ -894,7 +906,8 @@ function openScoreModal(div, stage, code) {
         });
         modal.querySelector('.score-total').textContent = `${ev.w1} : ${ev.w2}`;
         modal.querySelector('.score-result').innerHTML = ev.decided
-          ? `🏆 勝方：<b>${esc(ev.w1 > ev.w2 ? n1 : n2)}</b>` : ev.games.length ? '比賽進行中，可先儲存目前比分。' : '';
+          ? `🏆 勝方：<b>${esc(ev.w1 > ev.w2 ? n1 : n2)}</b>` : ev.games.length ? '比賽進行中，可先儲存目前比分。'
+          : woNow ? `目前判定：<b>${esc(woNow === 1 ? n1 : n2)}</b> 棄權，${esc(woNow === 1 ? n2 : n1)} 直接獲勝。` : '';
       };
       modal.querySelector('.game-rows').addEventListener('input', draw);
       modal.querySelector('.game-rows').addEventListener('keydown', (e) => {
@@ -907,18 +920,18 @@ function openScoreModal(div, stage, code) {
         modal.querySelectorAll('.pt-input').forEach((el) => { el.value = ''; });
         draw();
       });
-      modal.querySelector('[data-save]').addEventListener('click', async () => {
-        const ev = evaluate();
-        if (ev.problem) {
-          modal.querySelector('.score-result').innerHTML = `<span class="error">第 ${ev.problem.i + 1} 局：${ev.problem.message}</span>`;
+      // 儲存比分或棄權：games 是要寫入的內容，newWinner 是新的勝方（還沒分出勝負為 null）
+      const commit = async (games, newWinner) => {
+        const oldWinner = info.state === 'done' ? info.winner : null;
+        const changed = JSON.stringify(games) !== JSON.stringify(info.match.games);
+        // 冠軍賽／季軍賽是依循環賽名次產生的，產生後循環賽比分不能再改（勝負或局數都會影響名次）
+        if (/^S-/.test(code) && v.playoffs?.length && changed) {
+          modal.querySelector('.score-result').innerHTML = '<span class="error">已依循環賽名次產生冠軍賽／季軍賽。若要修改循環賽比分，請先在上方按「取消冠軍賽／季軍賽」。</span>';
           return;
         }
-        // 勝負改變時，若後續對戰已經有比分，要先清除後續比分（避免名次錯亂）
-        const oldWinner = info.state === 'done' ? info.winner : null;
-        const newWinner = ev.decided ? (ev.w1 > ev.w2 ? info.p1 : info.p2) : null;
-        // 冠軍賽／季軍賽是依循環賽名次產生的，產生後循環賽比分不能再改（勝負或局數都會影響名次）
-        if (/^S-/.test(code) && v.playoffs?.length && JSON.stringify(ev.games) !== JSON.stringify(info.match.games)) {
-          modal.querySelector('.score-result').innerHTML = '<span class="error">已依循環賽名次產生冠軍賽／季軍賽。若要修改循環賽比分，請先在上方按「取消冠軍賽／季軍賽」。</span>';
+        // 總決賽是依預賽名次產生的，產生後預賽比分不能再改，否則晉級名單與籤表會對不起來
+        if (stage === 'group' && v.final.length && changed) {
+          modal.querySelector('.score-result').innerHTML = '<span class="error">已經產生總決賽，預賽比分不能再修改。若要修改，請先在上方按「取消總決賽，回到預賽」。</span>';
           return;
         }
         if (oldWinner !== newWinner) {
@@ -930,8 +943,20 @@ function openScoreModal(div, stage, code) {
           }
         }
         close();
-        await run(() => backend.updateMatch(info.match.id, { games: ev.games, p1_id: info.p1, p2_id: info.p2 }), '比分已儲存');
+        await run(() => backend.updateMatch(info.match.id, { games, p1_id: info.p1, p2_id: info.p2 }), walkoverSide(games) ? '已判定棄權' : '比分已儲存');
+      };
+      modal.querySelector('[data-save]').addEventListener('click', () => {
+        const ev = evaluate();
+        if (ev.problem) {
+          modal.querySelector('.score-result').innerHTML = `<span class="error">第 ${ev.problem.i + 1} 局：${ev.problem.message}</span>`;
+          return;
+        }
+        commit(ev.games, ev.decided ? (ev.w1 > ev.w2 ? info.p1 : info.p2) : null);
       });
+      modal.querySelectorAll('[data-wo]').forEach((btn) => btn.addEventListener('click', () => {
+        const side = Number(btn.dataset.wo);
+        commit([WALKOVER[side]], side === 1 ? info.p2 : info.p1);
+      }));
       draw();
       [...modal.querySelectorAll('.game-row:not([hidden]) .pt-input')].find((el) => el.value === '')?.focus();
     }
@@ -1133,6 +1158,21 @@ const actions = {
   },
   generate,
   'make-final': makeFinal,
+  // 選手退賽：目前還沒打完、雙方都已確定的對戰，全部判對手直接獲勝（已打完的比分保留）
+  withdraw: () => {
+    const id = document.getElementById('wd-player')?.value;
+    if (!id) return toast('請先選擇退賽的選手', 'error');
+    const v = divisionView(state.division);
+    const todo = [v.res, v.groupRes, v.finalRes].filter(Boolean)
+      .flatMap((res) => [...res.values()])
+      .filter((r) => (r.state === 'ready' || r.state === 'live') && (r.p1 === id || r.p2 === id));
+    if (!todo.length) return toast(`${nameOf(id)} 目前沒有待打的對戰；之後輪到的對戰，請在該場按「棄權」`, 'error');
+    const list = todo.map((r) => `・${nameOf(r.p1)} 對 ${nameOf(r.p2)}`).join('\n');
+    if (!confirm(`判定「${nameOf(id)}」退賽？\n以下 ${todo.length} 場判對手直接獲勝：\n${list}\n\n已打完的比分會保留；之後才輪到的對戰請在該場按「棄權」。`)) return;
+    run(async () => {
+      for (const r of todo) await backend.updateMatch(r.match.id, { games: [WALKOVER[r.p1 === id ? 1 : 2]], p1_id: r.p1, p2_id: r.p2 });
+    }, `已判定 ${nameOf(id)} 退賽`);
+  },
   'make-playoffs': () => {
     const v = divisionView(state.division);
     if (!v.canMakePlayoffs) return;
@@ -1193,7 +1233,7 @@ function exportCtx() {
           if (r.state !== 'done' && r.state !== 'live') continue;
           const o = matchOutcome(r.match.games, bestOfFor(v.cfg, r.match.stage));
           matches.push({ stage: stageName, round: labelOf(r.match), p1: nameOf(r.p1), p2: nameOf(r.p2), score: `${o.w1} : ${o.w2}`,
-            games: r.match.games.map((g) => `${g[0]}:${g[1]}`).join('、'), winner: r.winner ? nameOf(r.winner) : '（進行中）' });
+            games: o.walkover ? '棄權' : r.match.games.map((g) => `${g[0]}:${g[1]}`).join('、'), winner: r.winner ? nameOf(r.winner) : '（進行中）' });
         }
       };
       push(v.res, FORMATS[v.cfg.format], (m) => roundLabel(m.code, v.size));
