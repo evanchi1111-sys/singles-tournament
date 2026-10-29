@@ -1,0 +1,126 @@
+/* 風格 H「排行榜」：參考 Kombai Turfside iOS 排行榜——翠綠頂欄、淡綠灰頁面、奶油色卡片、膠囊篩選、橘粉進度橫幅、頒獎台大頭照。 */
+:root, :root:root {
+  --green: #16874a; --green-d: #0f6b3a;
+  --bg: #e8f0eb; --card: #fbf8ef; --text: #14281c; --sub: #5d7266; --line: #d6e2da;
+  --brand: #16874a; --brand-2: #0f6b3a; --accent: #ff5c7c;
+  --ok: #0f7a43; --ok-bg: #d8f0e1; --bad: #c4253b; --bad-bg: #fde3e8;
+  --warn-bg: #fff0c2; --warn: #6b4f00; --info-bg: #e1ede5; --mine: #fff3c9;
+  --radius: 20px; --shadow: 0 2px 10px rgba(20, 40, 28, .08);
+  color-scheme: light;
+}
+body { font-family: "Manrope", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; background: var(--bg); }
+.container { width: min(720px, 100% - 28px); }
+
+/* 頂欄：綠底，功能分頁做成膠囊 */
+.topbar { background: var(--green); color: #fff; border: 0; padding-bottom: 12px; border-radius: 0 0 22px 22px; }
+.topbar-inner { min-height: 64px; }
+.brand h1 { font-size: 19px; font-weight: 800; }
+.brand-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; background: #fff; border-radius: 50%; font-size: 22px; }
+.live { opacity: 1; color: #d6f2e1; }
+.topbar .btn { background: #fff; color: var(--green-d); border: 0; border-radius: 999px; }
+.viewtabs { gap: 8px; padding: 0 0 2px; }
+.viewtab { background: transparent; color: #fff; border: 1.5px solid rgba(255, 255, 255, .6); border-radius: 999px; min-height: 38px; font-weight: 800; font-size: 14px; }
+.viewtab.on { background: #fff; color: var(--green-d); border-color: #fff; }
+
+main.container { padding-top: 18px; }
+.card, .table-wrap, .team-list, .center-card { background: var(--card); border: 0; border-radius: var(--radius); box-shadow: var(--shadow); }
+.card h3, .section-head h3 { font-weight: 800; font-size: 17px; }
+.btn { border-radius: 999px; border: 1.5px solid #c8d8cd; background: #fff; font-weight: 800; }
+.btn:hover { border-color: var(--green); color: var(--green-d); }
+.btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.primary:hover { background: var(--green-d); color: #fff; filter: none; }
+.btn.danger { background: #fff; }
+
+/* 組別與階段：膠囊篩選鈕 */
+.tabs { gap: 8px; }
+.tab { border: 1.5px solid #c8d8cd; border-radius: 999px; background: #fff; min-height: 46px; font-size: 15px; font-weight: 800; color: var(--text); }
+.tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+.subtabs { background: #fff; border: 0; border-radius: 999px; padding: 4px; }
+.subtab { border-radius: 999px; font-weight: 800; }
+.subtab.on { background: var(--green); color: #fff; }
+.format-pick { border-radius: 999px; background: #fff; }
+.seg { border-radius: 999px; }
+.seg.on { background: var(--green); color: #fff; box-shadow: none; }
+.chip, .count { background: #dcefe3; color: var(--green-d); }
+.status-badge { background: #fff; }
+.status-badge.playing, .mbadge.live { background: var(--accent); color: #fff; }
+
+/* 賽事進度：橘粉橫幅 */
+.card.status { background: linear-gradient(120deg, #ff8f4c, #ff5c7c); color: #fff; box-shadow: 0 8px 20px rgba(255, 92, 124, .3); }
+.card.status .status-text, .card.status .status-text b { color: #fff; }
+.card.status .rules-link { color: #fff; text-decoration: underline; }
+.card.status .progress { background: rgba(255, 255, 255, .35); height: 10px; }
+.card.status .progress-bar { background: #fff; }
+.card.status .picker label { color: #fff; }
+.card.status .picker select { border-radius: 999px; border: 0; }
+
+/* 戰績榜與頒獎台 */
+.board { background: var(--card); }
+.podium { margin: 24px 0 10px; }
+.pod-photo { border: 3px solid #fff; box-shadow: 0 8px 18px rgba(20, 40, 28, .2); border-radius: 18px; }
+.pod-1 .pod-photo { box-shadow: 0 12px 26px rgba(20, 40, 28, .28); }
+.rank-badge { top: 8px; left: 8px; border: 2px solid #fff; }
+.pod-name { font-weight: 800; }
+.pod.mine .pod-name, .pod.mine .xp { background: var(--mine); }
+.xp { background: #fff; border: 1px solid var(--line); margin-top: 4px; }
+.board-row { border-bottom: 1px solid #ebe5d2; padding: 10px 0; }
+.board-rows li:last-child .board-row { border: 0; }
+.board-row .xp { background: #f1ecda; border: 0; }
+.board-rows li.mine { border-radius: 14px; padding: 0 10px; margin: 0 -10px; }
+
+/* 頭像 */
+.av { background: #fff; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--line); }
+.av.cover { box-shadow: none; }
+.ttl { background: #dff1e6; color: var(--green-d); }
+.ttl.coach { background: #e3ebff; color: #2549a8; }
+.ttl.seed { background: #fff0c2; color: #7a5200; }
+
+/* 選手卡 */
+.player-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (min-width: 560px) { .player-grid { grid-template-columns: repeat(3, 1fr); } }
+.pcard { border: 0; background: #fff; border-radius: 18px; box-shadow: 0 4px 12px rgba(20, 40, 28, .1); }
+.pcard-tx b { font-size: 16px; font-weight: 800; }
+.player-chip { border: 0; background: #fff; box-shadow: 0 1px 4px rgba(20, 40, 28, .12); }
+
+/* 比賽卡與籤表 */
+.match, .mbox { background: #fff; border: 0; border-radius: 16px; box-shadow: 0 2px 8px rgba(20, 40, 28, .08); }
+.match.mine, .mbox.mine { background: var(--mine); }
+.mbox.bye, .mbox.pending { background: #f2f6f3; }
+.mbox.live, .match.playing { box-shadow: 0 0 0 2px var(--accent); }
+.mbox.clickable:hover, button.match:hover { box-shadow: 0 0 0 2px var(--green); }
+.mline + .mline { border-top: 1px solid var(--line); }
+.mline.win { color: var(--green-d); }
+.side.won { color: var(--green-d); }
+.side .score, .mline .pscore, .score-total { font-weight: 800; }
+.round-title, .section-title, .bcol h4, .rules h3 { color: var(--green-d); font-weight: 800; }
+.mgames span { background: #eef3ef; }
+
+/* 表格 */
+th { background: #eef4f0; color: var(--sub); font-weight: 800; }
+td, th { border-bottom-color: #ebe5d2; }
+.rank { color: var(--green-d); font-weight: 800; }
+.who-btn .team { font-weight: 800; }
+tr.qualified td { background: #ecf7f0; }
+.qtag { background: var(--green); }
+.seed-no { background: var(--green); border-radius: 50%; }
+.seed-list li, .placings li { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 1px 4px rgba(20, 40, 28, .08); }
+.placings li { gap: 10px; }
+.placings li.mine { background: var(--mine); }
+.idx { background: #dcefe3; color: var(--green-d); }
+.progress-bar { background: var(--green); }
+
+/* 對話框：手機上從下方滑出，像 iOS 的卡片視窗 */
+.backdrop { background: rgba(14, 30, 20, .5); align-items: end; padding: 0; }
+.modal { width: min(520px, 100%); margin: 0 auto; background: var(--card); border: 0; border-radius: 28px 28px 0 0; padding: 22px 20px 28px; box-shadow: 0 -10px 40px rgba(0, 0, 0, .25); max-height: 92vh; }
+@media (min-width: 640px) { .backdrop { align-items: center; padding: 16px; } .modal { border-radius: 28px; } }
+.profile-hero { margin-top: 2px; }
+.av.big { width: 132px; height: 132px; font-size: 40px; border: 5px solid #fff; box-shadow: 0 8px 20px rgba(20, 40, 28, .2); }
+.profile .stats div { background: #fff; border-radius: 16px; }
+.profile-matches li { background: #fff; border-radius: 14px; }
+input, select, textarea { border: 1.5px solid #c8d8cd; border-radius: 14px; background: #fff; }
+.pt-input { border-radius: 14px; border-width: 2px; }
+.banner.demo, .banner.warn { border-radius: 14px; }
+#toast { background: var(--green-d); border-radius: 999px; }
+:focus-visible { outline-color: var(--accent); }
+.tab { padding: 6px 10px; font-size: 14px; flex-wrap: wrap; line-height: 1.25; }
+.tab .count { font-size: 11px; white-space: nowrap; }

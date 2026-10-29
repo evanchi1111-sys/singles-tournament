@@ -22,6 +22,8 @@ function friendlyError(error) {
   if (/password should be at least|weak password/i.test(msg)) return new Error('密碼至少需要 6 個字元');
   if (/same.*password|different from the old/i.test(msg)) return new Error('新密碼不能和舊密碼相同');
   if (/failed to fetch|network/i.test(msg)) return new Error('網路連線失敗，請檢查網路後再試');
+  if (/(unit|title|photo_url)/.test(msg) && /column|schema cache/i.test(msg)) return new Error('資料庫尚未升級，請先在 Supabase 執行 supabase/upgrade-03-player-profiles.sql');
+  if (/bucket not found/i.test(msg)) return new Error('照片儲存空間尚未建立，請先執行 supabase/upgrade-03-player-profiles.sql');
   if (/sg_/.test(msg) && /schema cache|does not exist/i.test(msg)) return new Error('資料庫尚未設定，請先執行 supabase/setup.sql');
   return new Error(msg || '發生未知錯誤');
 }
@@ -109,6 +111,17 @@ async function createSupabaseBackend() {
     async deletePlayer(id) {
       mustAffect(await sb.from('sg_players').delete().eq('id', id).select());
     },
+    // 更新單一選手的基本資料（姓名、單位、頭銜、照片）
+    async updatePlayer(id, patch) {
+      mustAffect(await sb.from('sg_players').update(patch).eq('id', id).select());
+    },
+    // 上傳選手照片（已在瀏覽器縮小的 JPEG），回傳公開網址
+    async uploadPhoto(playerId, blob) {
+      const path = `${playerId}-${Date.now()}.jpg`;
+      const { error } = await sb.storage.from('sg-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
+      if (error) throw friendlyError(error);
+      return sb.storage.from('sg-photos').getPublicUrl(path).data.publicUrl;
+    },
     async createMatches(rows) {
       if (rows.length) check(await sb.from('sg_matches').insert(rows));
     },
@@ -146,8 +159,15 @@ function createDemoBackend() {
     competitive: ['陳志明', '林建宏', '黃俊傑', '張家豪', '李承翰', '王冠宇', '吳宗憲', '劉育成', '蔡明哲', '鄭凱文'],
     fun: ['許家銘', '郭建志', '洪偉倫', '邱冠廷', '周子豪', '曾柏翰', '彭俊宏'],
   };
+  // 示範用的單位與頭銜（虛構，僅供預覽畫面）
+  const seedUnits = ['台北市桌球協會', '新北市桌球隊', '台中市體育會', '高雄市桌球隊', '桃園市桌球隊', '台南市體育會', '新竹縣桌球隊', '宜蘭縣桌球隊', '基隆市桌球隊', '花蓮縣桌球隊'];
+  const seedTitles = ['隊長', '種子選手', '選手', '選手', '選手', '選手', '選手', '選手', '教練', '選手'];
   for (const [division, names] of Object.entries(seedNames)) {
-    names.forEach((name, i) => db.players.push({ id: uid(), division, name, seed: i + 1, grp: null, draw_group: null, draw_final: null, created_at: new Date(t0 + i).toISOString() }));
+    names.forEach((name, i) => db.players.push({
+      id: uid(), division, name, seed: i + 1, grp: null, draw_group: null, draw_final: null,
+      unit: seedUnits[i % seedUnits.length], title: seedTitles[i % seedTitles.length], photo_url: null,
+      created_at: new Date(t0 + i).toISOString(),
+    }));
   }
   let user = null;
   const dataListeners = new Set();
@@ -190,6 +210,22 @@ function createDemoBackend() {
       emit();
     },
     async deletePlayer(id) { requireOrganizer(); db.players = db.players.filter((p) => p.id !== id); emit(); },
+    async updatePlayer(id, patch) {
+      requireOrganizer();
+      const p = db.players.find((x) => x.id === id);
+      if (patch.name && db.players.some((x) => x.id !== id && x.division === p.division && x.name === patch.name)) throw new Error('名稱重複，請換一個');
+      Object.assign(p, patch);
+      emit();
+    },
+    // 示範模式：照片直接轉成網址字串，存在這個分頁的記憶體裡
+    async uploadPhoto(_playerId, blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('照片讀取失敗'));
+        reader.readAsDataURL(blob);
+      });
+    },
     async createMatches(rows) {
       requireOrganizer();
       rows.forEach((r) => db.matches.push({ id: uid(), games: [], p1_id: null, p2_id: null, grp: null, ...r }));

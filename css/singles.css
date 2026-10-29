@@ -101,3 +101,70 @@ tr.qualified td { background: color-mix(in srgb, var(--ok-bg) 70%, transparent);
 .rule-foot { font-size: 13px; color: var(--sub); }
 .rules-link { white-space: nowrap; font-weight: 700; color: var(--brand-2); }
 #rules { scroll-margin-top: 140px; }
+
+/* ---------- 選手頭像、選手卡、檔案（所有風格共用的基本樣式） ---------- */
+.viewtabs.three { grid-template-columns: repeat(3, 1fr); }
+.av { display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%; background: var(--info-bg); color: var(--sub); font-weight: 800; line-height: 1; }
+.av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av.xs { width: 22px; height: 22px; font-size: 9px; }
+.av.sm { width: 40px; height: 40px; font-size: 13px; }
+.av.cover { width: 100%; height: 100%; border-radius: 0; font-size: 34px; }
+.av.big { width: 120px; height: 120px; font-size: 36px; }
+.who-btn, .board-row, .player-chip, .pcard, .pod { font: inherit; color: inherit; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
+.who-btn { display: inline-flex; align-items: center; gap: 10px; }
+.who-tx { display: grid; min-width: 0; }
+.who-sub { display: block; font-size: 12px; font-weight: 500; color: var(--sub); }
+.mline .pname { display: flex; align-items: center; gap: 6px; }
+.seed-name { display: grid; }
+.seed-list li { gap: 8px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.player-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border: 1px solid var(--line); border-radius: 999px; font-weight: 700; background: var(--card); }
+.player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 10px; }
+.pcard { display: grid; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+.pcard-photo { aspect-ratio: 3 / 4; display: block; overflow: hidden; }
+.pcard-tx { display: grid; gap: 2px; padding: 10px 12px 12px; }
+.pcard-tx small { color: var(--sub); }
+.ttl { display: inline-block; width: fit-content; margin-top: 4px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; background: var(--ok-bg); color: var(--ok); }
+.ttl.coach { background: var(--info-bg); color: var(--brand-2); }
+.ttl.seed { background: var(--warn-bg); color: var(--warn); }
+.ttl.plain { background: var(--bg); color: var(--sub); }
+.xp { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--bg); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 10px; align-items: end; margin: 18px 0 10px; }
+.pod { display: grid; gap: 2px; justify-items: center; text-align: center; }
+.pod-photo { position: relative; width: 100%; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 14px; }
+.pod-1 .pod-photo { aspect-ratio: 3 / 4.4; }
+.rank-badge { position: absolute; top: 6px; left: 6px; z-index: 1; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; }
+.r1 { background: #2f6bdc; } .r2 { background: #e0567a; } .r3 { background: #d99a00; }
+.pod-name { font-weight: 800; margin-top: 6px; }
+.pod-unit { font-size: 11px; color: var(--sub); }
+.board-rows { list-style: none; margin: 8px 0 0; padding: 0; }
+.board-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0; }
+.board-row .who-tx { flex: 1; }
+.board-row .no { width: 20px; text-align: center; font-weight: 800; color: var(--sub); }
+.board-rows li.mine { background: var(--mine); }
+.profile { display: grid; justify-items: center; gap: 4px; text-align: center; position: relative; }
+.profile h2 { margin: 6px 0 0; font-size: 24px; }
+.profile p { margin: 0; }
+.profile-unit { color: var(--sub); font-weight: 600; }
+.profile-x { position: absolute; top: -6px; right: -6px; }
+.profile .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; margin-top: 10px; }
+.profile .stats div { background: var(--bg); border-radius: 12px; padding: 10px 4px; }
+.profile .stats b { display: block; font-size: 22px; }
+.profile .stats span { font-size: 12px; color: var(--sub); }
+.profile-h { margin: 14px 0 4px; align-self: start; font-size: 15px; }
+.profile-matches { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; max-height: 220px; overflow-y: auto; }
+.profile-matches li { display: grid; grid-template-columns: 1fr auto 3.2em; gap: 8px; text-align: left; padding: 8px 12px; border-radius: 10px; background: var(--bg); font-weight: 600; }
+.profile-matches em { font-style: normal; font-weight: 800; text-align: right; }
+.profile-matches .w em { color: var(--ok); } .profile-matches .l em { color: var(--bad); } .profile-matches .live em { color: var(--accent); }
+.profile .modal-actions { width: 100%; margin-top: 10px; }
+.photo-edit { display: flex; gap: 14px; align-items: center; }
+.photo-ctl { display: grid; gap: 6px; justify-items: start; }
+.file-btn { cursor: pointer; }
+.who-btn:focus-visible, .board-row:focus-visible, .pcard:focus-visible, .pod:focus-visible, .player-chip:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.seed-name { flex: 1; min-width: 0; }
+@media (max-width: 480px) {
+  .seed-list li { gap: 3px; }
+  .seed-list li .av { width: 30px; height: 30px; font-size: 10px; }
+  .seed-list li .icon-btn { width: 28px; padding: 0; }
+  .seed-name { padding-left: 2px; font-size: 14px; }
+}

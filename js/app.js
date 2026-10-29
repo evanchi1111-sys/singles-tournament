@@ -24,7 +24,7 @@ const state = {
   players: [],
   matches: [],
   user: null,
-  view: store.get('view', 'results') === 'admin' ? 'admin' : 'results',
+  view: ['admin', 'players'].includes(store.get('view', 'results')) ? store.get('view') : 'results',
   division: DIVISIONS[store.get('division')] ? store.get('division') : 'competitive',
   stageTab: store.get('stageTab', 'group'),
   me: store.get('me', ''),
@@ -51,6 +51,48 @@ const finalOptions = (cfg) => ({
   third: cfg.final_third ?? cfg.final_format === 'single',
 });
 const PLAYOFF_LABEL = { PF: '冠軍賽', PT: '季軍賽' };
+const TITLE_SUGGESTIONS = ['選手', '種子選手', '隊長', '教練', '領隊', '裁判'];
+
+// ---------------------------------------------------------------- 選手資料與頭像
+
+const AVATAR_COLORS = [['#bfe3cf', '#1f5a3d'], ['#f6cdd6', '#7a2e45'], ['#c9dcf7', '#2b4a80'], ['#f6e3a8', '#7a5a12'], ['#ddd0f3', '#4b3a7a'], ['#f8d3b8', '#7a3f17'], ['#c6e8e4', '#1f5a55']];
+const avatarColor = (name) => AVATAR_COLORS[[...String(name)].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+// 有照片就顯示照片，沒有就顯示姓名最後兩個字（中文名常用名字，不用姓）
+const avatar = (p, size = 'sm') => {
+  if (!p) return `<span class="av ${size}" aria-hidden="true">?</span>`;
+  if (p.photo_url) return `<span class="av ${size}"><img src="${esc(p.photo_url)}" alt="" loading="lazy"></span>`;
+  const [bg, fg] = avatarColor(p.name);
+  const text = [...p.name].slice(-2).join('');
+  return `<span class="av ${size}" style="background:${bg};color:${fg}" aria-hidden="true">${esc(text)}</span>`;
+};
+const subline = (p) => [p?.unit, p?.title].filter(Boolean).map(esc).join(' · ');
+const titleChip = (p) => (p?.title ? `<span class="ttl ${p.title === '教練' || p.title === '領隊' ? 'coach' : /種子|隊長/.test(p.title) ? 'seed' : ''}">${esc(p.title)}</span>` : '');
+
+// 這位選手在整個組別的戰績（勝敗、局數、得失分、每場結果）
+function playerRecord(v, id) {
+  const rec = { wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, pointsWon: 0, pointsLost: 0, matches: [] };
+  for (const res of [v.res, v.groupRes, v.finalRes].filter(Boolean)) {
+    for (const r of res.values()) {
+      if ((r.state !== 'done' && r.state !== 'live') || (r.p1 !== id && r.p2 !== id)) continue;
+      const mine = r.p1 === id ? 0 : 1;
+      const out = matchOutcome(r.match.games, bestOfFor(v.cfg, r.match.stage));
+      const [gw, gl] = mine === 0 ? [out.w1, out.w2] : [out.w2, out.w1];
+      rec.gamesWon += gw; rec.gamesLost += gl;
+      for (const g of r.match.games) { rec.pointsWon += g[mine]; rec.pointsLost += g[1 - mine]; }
+      const opp = mine === 0 ? r.p2 : r.p1;
+      const done = r.state === 'done';
+      if (done) { if (r.winner === id) rec.wins++; else rec.losses++; }
+      rec.matches.push({ opp, gw, gl, done, won: done && r.winner === id });
+    }
+  }
+  return rec;
+}
+
+// 戰績榜：依勝場、局差、分差排序（只列出已經打過比賽的選手）
+function leaderboardRows(v) {
+  return v.players.map((p) => ({ p, ...playerRecord(v, p.id) })).filter((r) => r.matches.length)
+    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || (b.gamesWon - b.gamesLost) - (a.gamesWon - a.gamesLost) || (b.pointsWon - b.pointsLost) - (a.pointsWon - a.pointsLost) || a.p.seed - b.p.seed);
+}
 
 let toastTimer;
 function toast(message, kind = 'info') {
@@ -219,8 +261,9 @@ function renderHeader() {
         </div>
         ${isOrganizer() ? `<button class="btn small" data-action="logout">登出主辦</button>` : ''}
       </div>
-      <nav class="container viewtabs two" aria-label="功能">
+      <nav class="container viewtabs three" aria-label="功能">
         <button class="viewtab ${state.view === 'results' ? 'on' : ''}" data-action="view" data-view="results" aria-pressed="${state.view === 'results'}">賽程與成績</button>
+        <button class="viewtab ${state.view === 'players' ? 'on' : ''}" data-action="view" data-view="players" aria-pressed="${state.view === 'players'}">參賽選手</button>
         <button class="viewtab ${state.view === 'admin' ? 'on' : ''}" data-action="view" data-view="admin" aria-pressed="${state.view === 'admin'}">主辦管理</button>
       </nav>
     </header>`;
@@ -246,7 +289,7 @@ function matchBox(info, { label = '', admin = false, stage }) {
     const won = info.state === 'done' && info.winner === pid;
     const text = pid ? esc(nameOf(pid)) : isBye ? '<i>輪空</i>' : '<i>待定</i>';
     const score = info.state === 'done' || info.state === 'live' ? (side === 1 ? out.w1 : out.w2) : '';
-    return `<div class="mline ${won ? 'win' : ''} ${pid && pid === me ? 'me' : ''}"><span class="pname">${text}</span><span class="pscore">${score}</span></div>`;
+    return `<div class="mline ${won ? 'win' : ''} ${pid && pid === me ? 'me' : ''}"><span class="pname">${pid ? avatar(playerById(pid), 'xs') : ''}<span>${text}</span></span><span class="pscore">${score}</span></div>`;
   };
   const bye1 = info.bye1 || (info.state === 'bye' && !info.p1);
   const bye2 = info.bye2 || (info.state === 'bye' && !info.p2);
@@ -321,7 +364,7 @@ function standingsTable(rows, { qualify = 0, admin = false, drawField, complete 
                  </select></label>` : '';
             return `<tr class="${r.id === state.me ? 'mine' : ''} ${complete && qualify && r.rank <= qualify && r.played ? 'qualified' : ''}">
               <td class="rank">${r.rank}</td>
-              <td class="left"><div class="team">${esc(nameOf(r.id))}${complete && qualify && r.rank <= qualify && r.played ? ' <span class="qtag">晉級</span>' : ''}</div><div class="basis show-sm">${esc(basis)}</div>${draw}</td>
+              <td class="left"><button type="button" class="who-btn" data-action="profile" data-id="${r.id}">${avatar(playerById(r.id), 'sm')}<span class="who-tx"><span class="team">${esc(nameOf(r.id))}${complete && qualify && r.rank <= qualify && r.played ? ' <span class="qtag">晉級</span>' : ''}</span>${playerById(r.id)?.unit ? `<small class="who-sub">${esc(playerById(r.id).unit)}</small>` : ''}</span></button><div class="basis show-sm">${esc(basis)}</div>${draw}</td>
               <td>${r.wins}</td><td>${r.losses}</td><td class="nowrap">${r.gamesWon}:${r.gamesLost}</td>
               <td class="hide-sm nowrap">${r.pointsWon}:${r.pointsLost}</td><td class="left hide-sm basis">${esc(basis)}</td>
             </tr>`;
@@ -343,7 +386,57 @@ function placingsCard(v) {
   return `
     <section class="card placings">
       <h3>🏆 ${DIVISIONS[v.div]} 名次</h3>
-      <ol>${v.placings.filter((p) => p.place <= 8).map((p) => `<li class="${p.id === state.me ? 'mine' : ''}"><span class="medal">${medal[p.place] || p.place}</span>${esc(nameOf(p.id))}</li>`).join('')}</ol>
+      <ol>${v.placings.filter((p) => p.place <= 8).map((p) => `<li class="${p.id === state.me ? 'mine' : ''}"><span class="medal">${medal[p.place] || p.place}</span>${avatar(playerById(p.id), 'sm')}<button type="button" class="who-btn" data-action="profile" data-id="${p.id}"><span class="who-tx"><span class="team">${esc(nameOf(p.id))}</span>${playerById(p.id)?.unit ? `<small class="who-sub">${esc(playerById(p.id).unit)}</small>` : ''}</span></button></li>`).join('')}</ol>
+    </section>`;
+}
+
+// 戰績榜：前三名頒獎台（含照片）＋ 其餘排名列
+function leaderboardCard(v) {
+  const rows = leaderboardRows(v);
+  if (!rows.length) return '';
+  const pill = (r) => `<span class="xp">${r.wins} 勝 ${r.losses} 敗</span>`;
+  const podium = rows.length >= 3 ? `
+    <div class="podium">
+      ${[1, 0, 2].map((i) => `
+        <button type="button" class="pod pod-${i + 1} ${rows[i].p.id === state.me ? 'mine' : ''}" data-action="profile" data-id="${rows[i].p.id}">
+          <span class="pod-photo"><span class="rank-badge r${i + 1}">${i + 1}</span>${avatar(rows[i].p, 'cover')}</span>
+          <span class="pod-name">${esc(rows[i].p.name)}</span>
+          <span class="pod-unit">${esc(rows[i].p.unit || '')}</span>
+          ${pill(rows[i])}
+        </button>`).join('')}
+    </div>` : '';
+  const rest = rows.length >= 3 ? rows.slice(3) : rows;
+  const offset = rows.length >= 3 ? 4 : 1;
+  return `
+    <section class="card board">
+      <h3>戰績榜</h3>
+      ${podium}
+      ${rest.length ? `<ol class="board-rows" start="${offset}">${rest.map((r, i) => `
+        <li class="${r.p.id === state.me ? 'mine' : ''}">
+          <button type="button" class="board-row" data-action="profile" data-id="${r.p.id}">
+            <span class="no">${offset + i}</span>${avatar(r.p, 'sm')}
+            <span class="who-tx"><span class="team">${esc(r.p.name)}</span><small class="who-sub">${subline(r.p) || '&nbsp;'}</small></span>
+            ${pill(r)}
+          </button>
+        </li>`).join('')}</ol>` : ''}
+      <p class="note">依勝場、局數差、得失分排序；點選手可看完整檔案。</p>
+    </section>`;
+}
+
+// 參賽選手頁：兩個組別的選手卡（姓名、單位、頭銜、照片）
+function renderPlayers() {
+  const list = playersOf(state.division);
+  const admin = isOrganizer();
+  return `
+    ${renderDivisionTabs()}
+    <section class="card">
+      <div class="section-head"><h3>參賽選手 <span class="count">${list.length} 人</span></h3></div>
+      ${admin ? '<p class="note">點選手卡片可查看檔案；主辦單位在檔案裡可編輯姓名、單位、頭銜與照片。</p>' : ''}
+      ${list.length ? `<div class="player-grid">${list.map((p) => `
+        <button type="button" class="pcard" data-action="profile" data-id="${p.id}">
+          <span class="pcard-photo">${avatar(p, 'cover')}</span>
+          <span class="pcard-tx"><b>${esc(p.name)}</b><small>${esc(p.unit || '（未填單位）')}</small>${titleChip(p)}</span>
+        </button>`).join('')}</div>` : emptyState('這個組別還沒有選手。')}
     </section>`;
 }
 
@@ -471,7 +564,8 @@ function rulesCard(v) {
 function renderCompetition(v, { admin }) {
   if (v.phase === 'setup') {
     return `${emptyState(admin ? '尚未產生賽程，請在上方設定賽制與選手名單。' : '主辦單位尚未產生賽程，以下為目前預定的賽制與規則。')}
-      ${!admin && v.players.length ? `<section class="card"><h3>報名選手（${v.players.length}）</h3><p>${v.players.map((p) => esc(p.name)).join('、')}</p></section>` : ''}
+      ${!admin && v.players.length ? `<section class="card"><h3>報名選手（${v.players.length}）</h3>
+        <div class="chip-row">${v.players.map((p) => `<button type="button" class="player-chip" data-action="profile" data-id="${p.id}">${avatar(p, 'xs')}${esc(p.name)}</button>`).join('')}</div></section>` : ''}
       ${admin ? '' : rulesCard(v)}`;
   }
   const pct = v.total ? Math.round((v.done / v.total) * 100) : 0;
@@ -530,6 +624,7 @@ function renderCompetition(v, { admin }) {
     </section>
     ${myBanner(v)}
     ${placingsCard(v)}
+    ${leaderboardCard(v)}
     ${body}
     ${rulesCard(v)}`;
 }
@@ -595,7 +690,8 @@ function renderSetup(v) {
       <ol class="seed-list">
         ${v.players.map((p, i) => `
           <li>
-            <span class="seed-no">${i + 1}</span><span class="seed-name">${esc(p.name)}</span>
+            <span class="seed-no">${i + 1}</span>${avatar(p, 'sm')}<span class="seed-name">${esc(p.name)}${subline(p) ? `<small class="who-sub">${subline(p)}</small>` : ''}</span>
+            <button class="icon-btn" data-action="edit-player" data-id="${p.id}" aria-label="編輯 ${esc(p.name)} 的資料" ${busy}>✎</button>
             <button class="icon-btn" data-action="move" data-id="${p.id}" data-dir="-1" aria-label="${esc(p.name)} 往前" ${busy || i === 0 ? 'disabled' : ''}>↑</button>
             <button class="icon-btn" data-action="move" data-id="${p.id}" data-dir="1" aria-label="${esc(p.name)} 往後" ${busy || i === n - 1 ? 'disabled' : ''}>↓</button>
             <button class="icon-btn del" data-action="delete-player" data-id="${p.id}" aria-label="刪除 ${esc(p.name)}" ${busy}>✕</button>
@@ -693,7 +789,8 @@ function render() {
     <main class="container">
       ${state.error ? `<div class="banner error">⚠️ 與資料庫連線異常：${esc(state.error)}（畫面可能不是最新）</div>` : ''}
       ${demo ? `<div class="banner demo">🧪 示範模式：資料只存在這個分頁，重新整理就會還原。</div>` : ''}
-      ${state.view === 'admin' ? renderAdmin() : `${renderDivisionTabs()}${renderCompetition(divisionView(state.division), { admin: false })}`}
+      ${state.view === 'admin' ? renderAdmin() : state.view === 'players' ? renderPlayers()
+        : `${renderDivisionTabs()}${renderCompetition(divisionView(state.division), { admin: false })}`}
     </main>`;
 }
 
@@ -850,6 +947,110 @@ function openPasswordModal() {
   );
 }
 
+// 選手檔案：頭像、單位、頭銜、戰績與每場結果
+function openProfileModal(id) {
+  const p = playerById(id);
+  if (!p) return;
+  const v = divisionView(p.division);
+  const rec = playerRecord(v, id);
+  const diff = rec.pointsWon - rec.pointsLost;
+  const rank = leaderboardRows(v).findIndex((r) => r.p.id === id) + 1;
+  openModal(`
+    <div class="profile">
+      <button type="button" class="icon-btn profile-x" data-close aria-label="關閉">✕</button>
+      <div class="profile-hero">${avatar(p, 'big')}</div>
+      <h2>${esc(p.name)}</h2>
+      <p class="profile-unit">${esc(p.unit || '（未填單位）')}</p>
+      <p>${titleChip(p)} <span class="ttl plain">${DIVISIONS[p.division]}・${p.seed} 號種子</span></p>
+      <div class="stats">
+        <div><b>${rec.wins}</b><span>勝</span></div>
+        <div><b>${rec.losses}</b><span>敗</span></div>
+        <div><b>${diff > 0 ? '+' : ''}${diff}</b><span>得失分</span></div>
+      </div>
+      ${rank ? `<p class="note profile-rank">目前戰績榜第 ${rank} 名</p>` : ''}
+      <h3 class="profile-h">本賽事戰績</h3>
+      ${rec.matches.length ? `<ul class="profile-matches">${rec.matches.map((m) => `
+        <li class="${m.done ? (m.won ? 'w' : 'l') : 'live'}"><span>vs ${esc(nameOf(m.opp))}</span><b>${m.gw} : ${m.gl}</b><em>${m.done ? (m.won ? '勝' : '敗') : '進行中'}</em></li>`).join('')}</ul>`
+        : '<p class="note">還沒有比賽紀錄。</p>'}
+      ${isOrganizer() ? `<div class="modal-actions"><button type="button" class="btn" data-edit>✎ 編輯資料</button></div>` : ''}
+    </div>`,
+  (modal, close) => {
+    modal.querySelector('[data-edit]')?.addEventListener('click', () => { close(); openEditPlayerModal(id); });
+  });
+}
+
+// 照片：置中裁成 3:4、縮到 480×640，轉成 JPEG（手機相機原圖動輒數 MB）
+async function resizePhoto(file) {
+  const bitmap = await createImageBitmap(file);
+  const W = 480, H = 640;
+  const scale = Math.max(W / bitmap.width, H / bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(bitmap, (W - bitmap.width * scale) / 2, (H - bitmap.height * scale) / 2, bitmap.width * scale, bitmap.height * scale);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('照片處理失敗'))), 'image/jpeg', 0.85));
+}
+
+function openEditPlayerModal(id) {
+  const p = playerById(id);
+  if (!p) return;
+  openModal(`
+    <h2>編輯選手資料</h2>
+    <form>
+      <div class="photo-edit">
+        <div class="photo-preview" id="photo-preview">${avatar(p, 'big')}</div>
+        <div class="photo-ctl">
+          <label class="btn small file-btn">選擇照片<input name="photo" type="file" accept="image/*" hidden></label>
+          <button type="button" class="btn small danger" data-remove-photo ${p.photo_url ? '' : 'hidden'}>移除照片</button>
+          <p class="note">照片會自動置中裁成直式 3:4，並縮小後上傳。</p>
+        </div>
+      </div>
+      <label>姓名<input name="name" maxlength="20" required value="${esc(p.name)}"></label>
+      <label>單位<input name="unit" maxlength="40" placeholder="例：新北市桌球隊" value="${esc(p.unit || '')}"></label>
+      <label>頭銜<input name="title" maxlength="20" list="title-list" placeholder="例：種子選手" value="${esc(p.title || '')}"></label>
+      <datalist id="title-list">${TITLE_SUGGESTIONS.map((t) => `<option value="${t}">`).join('')}</datalist>
+      <p class="error" hidden></p>
+      <div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary">儲存</button></div>
+    </form>`,
+  (modal, close) => {
+    const form = modal.querySelector('form');
+    const preview = modal.querySelector('#photo-preview');
+    const removeBtn = modal.querySelector('[data-remove-photo]');
+    const errorEl = form.querySelector('.error');
+    let newBlob = null;
+    let removed = false;
+    form.photo.addEventListener('change', async () => {
+      const file = form.photo.files[0];
+      if (!file) return;
+      try {
+        newBlob = await resizePhoto(file);
+        removed = false;
+        preview.innerHTML = `<span class="av big"><img src="${URL.createObjectURL(newBlob)}" alt=""></span>`;
+        removeBtn.hidden = false;
+      } catch { errorEl.textContent = '這個檔案無法當作照片，請換一張圖片'; errorEl.hidden = false; }
+    });
+    removeBtn.addEventListener('click', () => {
+      newBlob = null; removed = true; form.photo.value = '';
+      preview.innerHTML = avatar({ ...p, photo_url: null }, 'big');
+      removeBtn.hidden = true;
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.hidden = true;
+      const name = form.name.value.trim();
+      if (!name) return;
+      const ok = await run(async () => {
+        const patch = { name, unit: form.unit.value.trim() || null, title: form.title.value.trim() || null };
+        if (newBlob) patch.photo_url = await backend.uploadPhoto(p.id, newBlob);
+        else if (removed) patch.photo_url = null;
+        await backend.updatePlayer(p.id, patch);
+      }, '選手資料已儲存');
+      if (ok) close();
+    });
+  });
+}
+
 // ---------------------------------------------------------------- 操作
 
 const copyText = async (text, okMessage) => {
@@ -919,6 +1120,8 @@ const actions = {
   'stage-tab': ({ tab }) => { state.stageTab = tab; store.set('stageTab', tab); render(); },
   logout: async () => { await backend.signOut(); toast('已登出'); },
   score: ({ stage, code }) => openScoreModal(state.division, stage, code),
+  profile: ({ id }) => openProfileModal(id),
+  'edit-player': ({ id }) => openEditPlayerModal(id),
   shuffle: () => {
     if (!confirm('隨機打亂種子順序？')) return;
     const list = playersOf(state.division);
