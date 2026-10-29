@@ -129,8 +129,9 @@ export function assignGroups(seededIds, groupCount) {
   return assign;
 }
 
-export function buildGroups(seededIds, groupCount) {
-  const assign = assignGroups(seededIds, groupCount);
+// manualAssign：{ 選手id: 組別 }，由主辦單位自行安排分組；沒給就依種子蛇形分配
+export function buildGroups(seededIds, groupCount, manualAssign = null) {
+  const assign = manualAssign || assignGroups(seededIds, groupCount);
   const rows = [];
   for (const g of GROUP_LABELS.slice(0, groupCount)) {
     const members = seededIds.filter((id) => assign[id] === g);

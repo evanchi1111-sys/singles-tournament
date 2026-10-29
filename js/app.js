@@ -5,7 +5,7 @@ import {
   gameWinner, isStandardGame, matchOutcome, nextPow2, WALKOVER, isWalkover, walkoverSide,
   buildSingle, buildDouble, buildGroups, buildSuper, knockoutSeeds,
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
-} from './bracket.js?v=20261029t';
+} from './bracket.js?v=20261029u';
 import { exportExcel, lineReport } from './export.js';
 import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js';
 
@@ -557,7 +557,7 @@ function rulesCard(v) {
   } else {
     body = `
       <ol class="rule-steps">
-        <li><b>預賽分組：</b>依種子順序<b>蛇形</b>分成 ${c.group_count} 組（1 號種子在 A 組、2 號在 B 組…，下一輪反過來排），讓各組實力平均。</li>
+        <li><b>預賽分組：</b>共 ${c.group_count} 組，由主辦單位自行安排各組的選手名單。</li>
         <li><b>預賽：</b>組內單循環，每場${bo('group')}，每組前 <b>${c.advance_count}</b> 名晉級總決賽。</li>
         <li><b>總決賽：</b>每場${bo('final')}。${c.final_format === 'super'
           ? `晉級選手打<b>超級循環賽</b>：預賽<b>同組</b>的選手<b>不再重打</b>，直接帶入預賽兩人之間的對戰成績；只打<b>不同組</b>之間的比賽，依下方循環賽名次規則排名。${
@@ -666,19 +666,34 @@ function renderAdminLogin() {
     </section>`;
 }
 
+// 分組循環賽的分組：由主辦單位指定每位選手的組別（存在選手的 grp 欄位）
+function groupPlan(v) {
+  const labels = GROUP_LABELS.slice(0, v.cfg.group_count).split('');
+  const counts = Object.fromEntries(labels.map((g) => [g, 0]));
+  let unassigned = 0;
+  for (const p of v.players) {
+    if (labels.includes(p.grp)) counts[p.grp]++;
+    else unassigned++;
+  }
+  return { labels, counts, unassigned };
+}
+
 function renderSetup(v) {
   const c = v.cfg;
   const n = v.players.length;
   const busy = state.busy ? 'disabled' : '';
   const groupInfo = (() => {
     if (c.format !== 'groups') return '';
-    const G = c.group_count;
-    if (n < G * 2) return `<p class="banner warn">${n} 人分 ${G} 組，每組不到 2 人，請減少組數或增加選手。</p>`;
-    const min = Math.floor(n / G);
-    const max = Math.ceil(n / G);
-    const sizeText = min === max ? `每組 ${min} 人` : `每組 ${min}～${max} 人`;
-    const warn = c.advance_count >= min ? `<p class="banner warn">每組最少 ${min} 人，晉級名額需少於 ${min}。</p>` : '';
-    return `<p class="note">${n} 人分 ${G} 組，${sizeText}；共 ${G * c.advance_count} 人進入總決賽。</p>${warn}`;
+    const { labels, counts, unassigned } = groupPlan(v);
+    const G = labels.length;
+    const sizes = labels.map((g) => `${g} 組 ${counts[g]} 人`).join('、');
+    const warns = [];
+    if (unassigned) warns.push(`還有 ${unassigned} 位選手沒有指定組別，請在下方名單為每位選手選擇組別。`);
+    const small = labels.filter((g) => counts[g] < 2);
+    if (small.length) warns.push(`${small.join('、')} 組不到 2 人，每組至少要 2 人。`);
+    const min = Math.min(...labels.map((g) => counts[g]));
+    if (!small.length && c.advance_count >= min) warns.push(`人數最少的組只有 ${min} 人，每組晉級名額需少於 ${min}。`);
+    return `<p class="note">分組由主辦單位自行安排：${n} 人分 ${G} 組（${sizes}）；每組晉級 ${c.advance_count} 人，共 ${G * c.advance_count} 人進入總決賽。</p>${warns.map((w) => `<p class="banner warn">${w}</p>`).join('')}`;
   })();
   return `
     <section class="card">
@@ -700,18 +715,21 @@ function renderSetup(v) {
           ${finalExtrasSelects(c)}` : ''}
       </div>
       ${groupInfo}
-      <p class="note">${{ single: '單淘汰：輸一場即淘汰，加打季軍賽。', double: '雙淘汰：輸兩場才淘汰，冠軍戰一場定勝負（至少 3 人）。', roundrobin: '單循環：每位選手都和其他所有選手各打一場，依勝場排名，沒有淘汰（至少 2 人）。', groups: '分組循環：依種子蛇形分組，組內單循環，各組前幾名進入總決賽。' }[c.format]}</p>
+      <p class="note">${{ single: '單淘汰：輸一場即淘汰，加打季軍賽。', double: '雙淘汰：輸兩場才淘汰，冠軍戰一場定勝負（至少 3 人）。', roundrobin: '單循環：每位選手都和其他所有選手各打一場，依勝場排名，沒有淘汰（至少 2 人）。', groups: '分組循環：由主辦單位自行安排分組，組內單循環，各組前幾名進入總決賽。' }[c.format]}</p>
     </section>
 
     <section class="card">
       <div class="section-head">
         <h3>② 選手與種子順序 <span class="count">${n} 人</span></h3>
       </div>
-      <p class="note">順序就是種子序：第 1 位為 1 號種子。種子由主辦單位現場抽籤或依實力決定後，用右邊的 ↑↓ 手動排好；淘汰賽的輪空優先給前段種子，分組時依此順序蛇形分配。</p>
+      <p class="note">順序就是種子序：第 1 位為 1 號種子。種子由主辦單位現場抽籤或依實力決定後，用右邊的 ↑↓ 手動排好；淘汰賽的輪空優先給前段種子。分組循環賽的分組則由主辦單位直接指定每位選手的組別。</p>
       <ol class="seed-list">
         ${v.players.map((p, i) => `
           <li>
             <span class="seed-no">${i + 1}</span>${avatar(p, 'sm')}<span class="seed-name">${esc(p.name)}${subline(p) ? `<small class="who-sub">${subline(p)}</small>` : ''}</span>
+            ${c.format === 'groups' ? `<select class="grp-select" data-change="player-group" data-id="${p.id}" aria-label="${esc(p.name)} 的組別" ${busy}>
+              <option value="">選組別</option>${groupPlan(v).labels.map((g) => `<option value="${g}" ${p.grp === g ? 'selected' : ''}>${g} 組</option>`).join('')}
+            </select>` : ''}
             <button class="icon-btn" data-action="move" data-id="${p.id}" data-dir="-1" aria-label="${esc(p.name)} 往前" ${busy || i === 0 ? 'disabled' : ''}>↑</button>
             <button class="icon-btn" data-action="move" data-id="${p.id}" data-dir="1" aria-label="${esc(p.name)} 往後" ${busy || i === n - 1 ? 'disabled' : ''}>↓</button>
             <button class="icon-btn del" data-action="delete-player" data-id="${p.id}" aria-label="刪除 ${esc(p.name)}" ${busy}>✕</button>
@@ -1045,11 +1063,13 @@ function generate() {
     rows = built.rows;
     playerPatch = v.players.map((p) => ({ ...p, grp: built.assign[p.id], draw_group: null, draw_final: null }));
   } else {
-    const G = c.group_count;
-    const min = Math.floor(n / G);
-    if (n < G * 2) return toast(`${n} 人分 ${G} 組，每組不到 2 人，請減少組數`, 'error');
-    if (c.advance_count >= min) return toast(`每組最少 ${min} 人，晉級名額需少於 ${min}`, 'error');
-    const built = buildGroups(ids, G);
+    const { labels, counts, unassigned } = groupPlan(v);
+    if (unassigned) return toast(`還有 ${unassigned} 位選手沒有指定組別`, 'error');
+    const small = labels.filter((g) => counts[g] < 2);
+    if (small.length) return toast(`${small.join('、')} 組不到 2 人，每組至少要 2 人`, 'error');
+    const min = Math.min(...labels.map((g) => counts[g]));
+    if (c.advance_count >= min) return toast(`人數最少的組只有 ${min} 人，晉級名額需少於 ${min}`, 'error');
+    const built = buildGroups(ids, labels.length, Object.fromEntries(v.players.map((p) => [p.id, p.grp])));
     rows = built.rows;
     playerPatch = v.players.map((p) => ({ ...p, grp: built.assign[p.id], draw_group: null, draw_final: null }));
   }
@@ -1191,7 +1211,7 @@ const actions = {
     if (!confirm('再次確認：比分刪除後無法復原。')) return;
     run(async () => {
       await backend.deleteMatches(state.division, ['main', 'group', 'final']);
-      await backend.savePlayers(playersOf(state.division).map((p) => ({ ...p, grp: null, draw_group: null, draw_final: null })));
+      await backend.savePlayers(playersOf(state.division).map((p) => ({ ...p, draw_group: null, draw_final: null }))); // 分組保留，重設後不必重新指定
     }, '已重設賽程');
   },
   'export-excel': () => {
@@ -1264,6 +1284,11 @@ app.addEventListener('change', (e) => {
     if (field === 'advance_count' && !(value >= 1 && value <= 8)) return toast('晉級人數需為 1～8', 'error');
     el.blur();
     run(() => backend.updateDivision(state.division, { [field]: value }));
+  } else if (kind === 'player-group') {
+    const p = playerById(el.dataset.id);
+    const grp = el.value || null;
+    el.blur();
+    run(() => backend.savePlayers([{ ...p, grp }]));
   } else if (kind === 'draw') {
     const p = playerById(el.dataset.id);
     const value = el.value ? Number(el.value) : null;
