@@ -5,7 +5,7 @@ import {
   gameWinner, isStandardGame, matchOutcome, nextPow2, WALKOVER, isWalkover, walkoverSide,
   buildSingle, buildDouble, buildGroups, buildSuper, knockoutSeeds,
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
-} from './bracket.js?v=20261029s';
+} from './bracket.js?v=20261029t';
 import { exportExcel, lineReport } from './export.js';
 import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js';
 
@@ -706,9 +706,8 @@ function renderSetup(v) {
     <section class="card">
       <div class="section-head">
         <h3>② 選手與種子順序 <span class="count">${n} 人</span></h3>
-        <button class="btn small" data-action="shuffle" ${busy || n < 2 ? 'disabled' : ''}>🎲 隨機抽籤</button>
       </div>
-      <p class="note">順序就是種子序：第 1 位為 1 號種子。淘汰賽的輪空優先給前段種子；分組時依此順序蛇形分配。</p>
+      <p class="note">順序就是種子序：第 1 位為 1 號種子。種子由主辦單位現場抽籤或依實力決定後，用右邊的 ↑↓ 手動排好；淘汰賽的輪空優先給前段種子，分組時依此順序蛇形分配。</p>
       <ol class="seed-list">
         ${v.players.map((p, i) => `
           <li>
@@ -1133,15 +1132,6 @@ const actions = {
   logout: async () => { await backend.signOut(); toast('已登出'); },
   score: ({ stage, code }) => openScoreModal(state.division, stage, code),
   profile: ({ id }) => openProfileModal(id),
-  shuffle: () => {
-    if (!confirm('隨機打亂種子順序？')) return;
-    const list = playersOf(state.division);
-    for (let i = list.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [list[i], list[j]] = [list[j], list[i]];
-    }
-    run(() => backend.savePlayers(list.map((p, i) => ({ ...p, seed: i + 1 }))), '已隨機抽籤');
-  },
   move: ({ id, dir }) => {
     const list = playersOf(state.division);
     const i = list.findIndex((p) => p.id === id);
