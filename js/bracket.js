@@ -3,7 +3,7 @@
 // 這樣上游比分修改時，下游的對戰選手會自動跟著更新。
 
 export const DIVISIONS = { competitive: '競賽組', fun: '歡樂成長組' };
-export const FORMATS = { single: '單淘汰賽', double: '雙淘汰賽', groups: '分組循環賽' };
+export const FORMATS = { single: '單淘汰賽', double: '雙淘汰賽', roundrobin: '單循環賽', groups: '分組循環賽' };
 export const FINAL_FORMATS = { single: '單淘汰賽', super: '超級循環賽' };
 export const BEST_OF = { 3: '三局兩勝', 5: '五局三勝', 7: '七局四勝' };
 export const GROUP_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
