@@ -76,7 +76,7 @@ export function peopleApi(sb) {
     async remove(name) {
       const { data, error } = await sb.from('people').delete().eq('name', name).select();
       if (error) throw friendly(error);
-      if (!data || !data.length) throw new Error('沒有寫入權限，請重新登入主辦帳號');
+      if (!data || !data.length) throw new Error('沒有刪除到任何資料：這位選手可能已經被刪除，或目前的登入沒有刪除權限');
     },
     async save(name, patch) {
       const row = { name, ...patch, updated_at: new Date().toISOString() };

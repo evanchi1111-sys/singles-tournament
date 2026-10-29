@@ -1,5 +1,5 @@
 import { ORGANIZER_EMAIL } from './config.js';
-import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029n';
+import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029o';
 import {
   DIVISIONS, FORMATS, FINAL_FORMATS, BEST_OF, GROUP_LABELS,
   gameWinner, isStandardGame, matchOutcome, nextPow2,
