@@ -786,7 +786,7 @@ function render() {
   }
   app.innerHTML = `
     ${renderHeader()}
-    <main class="container">
+    <main class="container view-${state.view}">
       ${state.error ? `<div class="banner error">⚠️ 與資料庫連線異常：${esc(state.error)}（畫面可能不是最新）</div>` : ''}
       ${demo ? `<div class="banner demo">🧪 示範模式：資料只存在這個分頁，重新整理就會還原。</div>` : ''}
       ${state.view === 'admin' ? renderAdmin() : state.view === 'players' ? renderPlayers()

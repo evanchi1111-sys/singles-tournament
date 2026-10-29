@@ -124,3 +124,57 @@ input, select, textarea { border: 1.5px solid #c8d8cd; border-radius: 14px; back
 :focus-visible { outline-color: var(--accent); }
 .tab { padding: 6px 10px; font-size: 14px; flex-wrap: wrap; line-height: 1.25; }
 .tab .count { font-size: 11px; white-space: nowrap; }
+
+/* ================= 電腦版（螢幕寬度 ≥ 960px）：寬版、戰績榜固定在左、賽程在右 ================= */
+@media (min-width: 960px) {
+  .container { width: min(1180px, 100% - 64px); }
+  main.container.view-admin { width: min(860px, 100% - 64px); }
+
+  /* 頂欄：標題在左、功能分頁在右同一列 */
+  .topbar { border-radius: 0 0 28px 28px; padding-bottom: 0; }
+  .topbar-inner { min-height: 76px; }
+  .brand h1 { font-size: 22px; }
+  .viewtabs.three { grid-template-columns: repeat(3, auto); justify-content: start; gap: 8px; padding: 0 0 16px; }
+  .viewtab { padding: 0 24px; min-height: 40px; font-size: 15px; }
+  .viewtab:hover:not(.on) { background: rgba(255, 255, 255, .14); }
+
+  main.container { padding-top: 26px; padding-bottom: 64px; }
+
+  /* 成績頁：上方整排全寬，戰績榜固定在左欄，賽程與名次在右欄 */
+  main.container.view-results { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 18px 28px; align-items: start; }
+  main.container.view-results > * { grid-column: 1 / -1; }
+  main.container.view-results > .board { grid-column: 1; grid-row: span 8; position: sticky; top: 96px; }
+  main.container.view-results > .board ~ * { grid-column: 2; }
+  main.container.view-results > .card { margin-bottom: 0; }
+
+  .tabs { max-width: 560px; }
+  .card.status { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; align-items: center; padding: 20px 26px; }
+  .card.status .progress { grid-column: 1 / -1; }
+  .card.status .picker { margin: 0; justify-self: end; }
+  .podium { gap: 14px; }
+  .bracket { gap: 20px; padding-bottom: 18px; }
+  .bcol { min-width: 230px; flex-basis: 230px; }
+  .match-grid, .match-list { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+
+  /* 參賽選手頁：多欄照片牆 */
+  .player-grid { grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  main.container.view-players { padding-top: 26px; }
+  .pcard { transition: transform .12s, box-shadow .12s; }
+  .pcard:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(20, 40, 28, .16); }
+  .pcard-tx { padding: 12px 14px 14px; }
+
+  /* 表格與名次：用滑鼠操作，加上懸停回饋 */
+  .who-btn:hover .team, .board-row:hover .team { color: var(--green); text-decoration: underline; }
+  .board-row, .placings li { cursor: pointer; }
+  .mbox.clickable:hover, button.match:hover { transform: translateY(-1px); }
+
+  /* 對話框置中，不再從底部滑出 */
+  .backdrop { align-items: center; padding: 24px; }
+  .modal { border-radius: 28px; width: min(560px, 100%); }
+}
+@media (min-width: 1280px) {
+  .player-grid { grid-template-columns: repeat(5, 1fr); }
+}
+@media (min-width: 960px) and (max-width: 1100px) {
+  .player-grid { grid-template-columns: repeat(3, 1fr); }
+}

@@ -168,3 +168,8 @@ tr.qualified td { background: color-mix(in srgb, var(--ok-bg) 70%, transparent);
   .seed-list li .icon-btn { width: 28px; padding: 0; }
   .seed-name { padding-left: 2px; font-size: 14px; }
 }
+
+/* 賽制設定欄位：下拉選單不可撐出畫面（手機一欄、較寬時多欄） */
+.grid-form { grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
+.grid-form > label { min-width: 0; }
+.grid-form select, .grid-form input { width: 100%; min-width: 0; max-width: 100%; }
