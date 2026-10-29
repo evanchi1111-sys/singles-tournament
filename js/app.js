@@ -1,5 +1,5 @@
 import { ORGANIZER_EMAIL } from './config.js';
-import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029j';
+import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029n';
 import {
   DIVISIONS, FORMATS, FINAL_FORMATS, BEST_OF, GROUP_LABELS,
   gameWinner, isStandardGame, matchOutcome, nextPow2,
@@ -7,7 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js';
 import { exportExcel, lineReport } from './export.js';
-import { avatar as avatarOf, titleChip as titleChipOf } from './people.js';
+import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js';
 
 const demo = new URLSearchParams(location.search).has('demo');
 const store = {
@@ -23,6 +23,7 @@ const state = {
   settings: { title: '桌球單打賽' },
   divisions: { competitive: { id: 'competitive', ...DEFAULT_DIVISION }, fun: { id: 'fun', ...DEFAULT_DIVISION } },
   players: [],
+  results: {}, // 選手歷年成績（冠、亞、季軍）：{ 姓名: [成績] }
   matches: [],
   user: null,
   view: ['admin', 'players'].includes(store.get('view', 'results')) ? store.get('view') : 'results',
@@ -434,7 +435,7 @@ function renderPlayers() {
     ${renderDivisionTabs()}
     <section class="card">
       <div class="section-head"><h3>參賽選手 <span class="count">${list.length} 人</span></h3></div>
-      ${admin ? '<p class="note">點選手卡片可查看檔案；主辦單位在檔案裡可編輯姓名、單位、頭銜與照片。</p>' : ''}
+      ${admin ? '<p class="note">點選手卡片可查看檔案；單位、頭銜與照片請到「選手資料庫」頁維護。</p>' : ''}
       ${list.length ? `<div class="player-grid">${list.map((p) => `
         <button type="button" class="pcard" data-action="profile" data-id="${p.id}">
           <span class="pcard-photo">${avatar(p, 'cover')}</span>
@@ -699,15 +700,8 @@ function renderSetup(v) {
             <button class="icon-btn del" data-action="delete-player" data-id="${p.id}" aria-label="刪除 ${esc(p.name)}" ${busy}>✕</button>
           </li>`).join('') || '<li class="note">尚無選手</li>'}
       </ol>
-      <form class="inline-form" data-form="add-player">
-        <input name="name" maxlength="20" placeholder="新增選手姓名" required autocomplete="off" aria-label="新增選手姓名">
-        <button class="btn" ${busy}>新增</button>
-      </form>
-      <form class="form" data-form="bulk-players">
-        <label>批次匯入（每行一位，或用逗號、頓號分開；依序排在最後）
-          <textarea name="text" rows="3" placeholder="王小明&#10;李大華、陳志強"></textarea></label>
-        <button class="btn" ${busy}>匯入</button>
-      </form>
+      <div class="actions"><button class="btn primary" data-action="pick-players" ${busy}>👥 從選手資料庫挑選參賽選手</button></div>
+      <p class="note">選手資料請先在「選手資料庫」頁建立；在這裡勾選誰參加${DIVISIONS[v.div]}，不需要再輸入或匯入。</p>
     </section>
 
     <section class="card">
@@ -731,6 +725,7 @@ function renderAdmin() {
     else actions.push(`<button class="btn" data-action="cancel-playoffs" ${busy}>取消${names}</button>`);
   }
   if (v.phase === 'final') actions.push(`<button class="btn" data-action="reset-final" ${busy}>取消總決賽，回到預賽</button>`);
+  if ((v.placings || []).some((p) => p.place <= 3)) actions.push(`<button class="btn primary" data-action="save-results" ${busy}>🏅 存入選手成績（冠亞季軍）</button>`);
   if (v.phase !== 'setup') actions.push(`<button class="btn danger" data-action="reset" ${busy}>重設本組賽程</button>`);
   const minGroup = v.groups ? Math.min(...v.groups.map((g) => g.ids.length)) : 0;
   // 總決賽產生前，晉級人數與總決賽賽制都還可以調整
@@ -972,6 +967,7 @@ function openProfileModal(id) {
         <div><b>${diff > 0 ? '+' : ''}${diff}</b><span>得失分</span></div>
       </div>
       ${rank ? `<p class="note profile-rank">目前戰績榜第 ${rank} 名</p>` : ''}
+      ${resultsHtml(state.results[p.name])}
       <h3 class="profile-h">本賽事戰績</h3>
       ${rec.matches.length ? `<ul class="profile-matches">${rec.matches.map((m) => `
         <li class="${m.done ? (m.won ? 'w' : 'l') : 'live'}"><span>vs ${esc(nameOf(m.opp))}</span><b>${m.gw} : ${m.gl}</b><em>${m.done ? (m.won ? '勝' : '敗') : '進行中'}</em></li>`).join('')}</ul>`
@@ -1038,8 +1034,46 @@ function makeFinal() {
   }, '總決賽已產生');
 }
 
-function parseNames(text) {
-  return [...new Set(text.split(/[\r\n,，、]+/).map((s) => s.trim()).filter(Boolean))];
+// 把這個組別的冠、亞、季軍存入選手資料庫的「歷年成績」（同一年度重存會取代舊的）
+function saveResults() {
+  const v = divisionView(state.division);
+  const top = (v.placings || []).filter((p) => p.place <= 3);
+  if (!top.length) return toast('這個組別還沒有決出名次', 'error');
+  const summary = `單打賽 ${DIVISIONS[v.div]}\n${top.map((p) => `${PLACE_LABEL[p.place]}：${nameOf(p.id)}`).join('\n')}`;
+  openSaveResultsDialog({
+    openModal,
+    summary,
+    onConfirm: ({ year, event }) => run(
+      () => backend.saveResults('singles', v.div, year, event, top.map((p) => ({ name: nameOf(p.id), place: p.place, detail: null }))),
+      `已存入「${event}」${DIVISIONS[v.div]}冠亞季軍`),
+  });
+}
+
+// 從選手資料庫勾選這個組別的參賽選手：新勾的加入名單（排在最後），取消勾選的移除
+function pickPlayers() {
+  const div = state.division;
+  const list = playersOf(div);
+  openPeoplePicker({
+    openModal,
+    people: state.people,
+    extra: list.map((p) => p.name),
+    selected: list.map((p) => p.name),
+    title: `挑選${DIVISIONS[div]}參賽選手`,
+    hint: '勾選要參賽的選手；取消勾選會從名單移除。種子順序可以回到名單用 ↑ ↓ 調整。',
+    onConfirm: async (picked) => {
+      const have = new Set(list.map((p) => p.name));
+      const add = picked.filter((n) => !have.has(n));
+      const drop = list.filter((p) => !picked.includes(p.name));
+      if (!add.length && !drop.length) return true;
+      if (add.some((n) => n.length > 20)) { toast('姓名超過 20 字，無法加入名單', 'error'); return false; }
+      if (drop.length && !confirm(`將從名單移除：${drop.map((p) => p.name).join('、')}。確定嗎？`)) return false;
+      const start = Math.max(0, ...list.map((p) => p.seed)) + 1;
+      return run(async () => {
+        if (add.length) await backend.addPlayers(add.map((name, i) => ({ division: div, name, seed: start + i })));
+        for (const p of drop) await backend.deletePlayer(p.id);
+      }, '參賽名單已更新');
+    },
+  });
 }
 
 const actions = {
@@ -1067,6 +1101,8 @@ const actions = {
     [list[i], list[j]] = [list[j], list[i]];
     run(() => backend.savePlayers(list.map((p, k) => ({ ...p, seed: k + 1 }))));
   },
+  'pick-players': pickPlayers,
+  'save-results': saveResults,
   'delete-player': ({ id }) => {
     if (!confirm(`確定刪除選手「${nameOf(id)}」？`)) return;
     run(() => backend.deletePlayer(id), '已刪除');
@@ -1189,14 +1225,6 @@ app.addEventListener('submit', async (e) => {
   const kind = form.dataset.form;
   if (kind === 'login') {
     await run(() => backend.signIn(form.email.value.trim(), form.password.value), '已登入主辦模式');
-  } else if (kind === 'add-player' || kind === 'bulk-players') {
-    const names = kind === 'add-player' ? [form.name.value.trim()].filter(Boolean) : parseNames(form.text.value);
-    const list = playersOf(state.division);
-    const existing = new Set(list.map((p) => p.name));
-    const fresh = names.filter((n) => !existing.has(n) && n.length <= 20);
-    if (!fresh.length) return toast(names.length ? '這些選手已經在名單中' : '請輸入選手姓名', 'error');
-    const start = Math.max(0, ...list.map((p) => p.seed)) + 1;
-    if (await run(() => backend.addPlayers(fresh.map((name, i) => ({ division: state.division, name, seed: start + i }))), `已新增 ${fresh.length} 位選手`)) form.reset();
   } else if (kind === 'title') {
     await run(() => backend.updateSettings({ title: form.title.value.trim() }), '標題已更新');
   }

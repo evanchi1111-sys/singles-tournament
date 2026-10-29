@@ -1,5 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ORGANIZER_EMAIL } from './config.js';
-import { peopleApi, demoPeopleApi } from './people.js';
+import { peopleApi, demoPeopleApi, resultsApi, demoResultsApi } from './people.js';
 
 export const DEFAULT_DIVISION = {
   format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null,
@@ -52,15 +52,17 @@ async function createSupabaseBackend() {
   };
   const now = () => new Date().toISOString();
   const people = peopleApi(sb);
+  const results = resultsApi(sb);
 
   return {
     async load() {
-      const [settings, divisions, players, matches, peopleMap] = await Promise.all([
+      const [settings, divisions, players, matches, peopleMap, resultsMap] = await Promise.all([
         sb.from('sg_settings').select('*').eq('id', 1).maybeSingle(),
         sb.from('sg_divisions').select('*'),
         sb.from('sg_players').select('*').order('seed').order('created_at'),
         sb.from('sg_matches').select('*'),
         people.load(),
+        results.load(),
       ]);
       return {
         settings: check(settings) || { title: '桌球單打賽' },
@@ -68,6 +70,8 @@ async function createSupabaseBackend() {
         players: check(players),
         matches: check(matches),
         people: peopleMap,
+        results: resultsMap,
+
       };
     },
     subscribe(onChange, onStatus = () => {}) {
@@ -112,6 +116,8 @@ async function createSupabaseBackend() {
     async savePlayers(rows) {
       if (rows.length) mustAffect(await sb.from('sg_players').upsert(rows).select());
     },
+    // 把冠、亞、季軍存入選手歷年成績（同一比賽、組別、年度會整批取代）
+    async saveResults(system, division, year, event, rows) { await results.replace(system, division, year, event, rows); },
     async deletePlayer(id) {
       mustAffect(await sb.from('sg_players').delete().eq('id', id).select());
     },
@@ -143,6 +149,11 @@ function createDemoBackend() {
   const DEMO_PASSWORD = 'demo1234';
   const t0 = Date.now();
   const peopleDemo = demoPeopleApi();
+  const resultsDemo = demoResultsApi([
+    { name: '陳志明', year: 2025, system: 'singles', division: 'competitive', place: 1, detail: null },
+    { name: '林建宏', year: 2025, system: 'singles', division: 'competitive', place: 2, detail: null },
+    { name: '黃俊傑', year: 2025, system: 'singles', division: 'competitive', place: 3, detail: null },
+  ]);
   const db = {
     settings: { title: '桌球單打賽' },
     divisions: toDivisionMap([]),
@@ -163,6 +174,9 @@ function createDemoBackend() {
       created_at: new Date(t0 + i).toISOString(),
     }));
   }
+  // 示範用的選手資料庫：比賽名單以外，再多幾位可以挑選的選手
+  [...seedNames.competitive, ...seedNames.fun, '王小明', '李大華', '陳志強', '張美玲', '黃淑芬', '蔡宜君', '鄭雅婷']
+    .forEach((n, i) => peopleDemo.save(n, { unit: seedUnits[i % seedUnits.length], title: i % 5 === 0 ? '隊長' : '選手', photo_url: null }));
   let user = (() => { try { return sessionStorage.getItem('demo_organizer') ? { email: ORGANIZER_EMAIL } : null; } catch { return null; } })(); // 示範模式：同一個分頁切換系統時保留主辦登入
   const dataListeners = new Set();
   const authListeners = new Set();
@@ -173,7 +187,8 @@ function createDemoBackend() {
   return {
     isDemo: true,
     demoPassword: DEMO_PASSWORD,
-    async load() { return { ...clone(db), people: await peopleDemo.load() }; },
+    async load() { return { ...clone(db), people: await peopleDemo.load(), results: await resultsDemo.load() }; },
+    async saveResults(system, division, year, event, rows) { requireOrganizer(); await resultsDemo.replace(system, division, year, event, rows); emit(); },
     subscribe(onChange, onStatus = () => {}) {
       dataListeners.add(onChange);
       setTimeout(() => onStatus('SUBSCRIBED'), 0);

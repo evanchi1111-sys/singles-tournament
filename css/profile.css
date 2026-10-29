@@ -79,3 +79,33 @@
 .photo-ctl { display: grid; gap: 6px; justify-items: start; }
 .file-btn { cursor: pointer; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.person.static { cursor: default; }
+.person.static .btn { margin-top: 6px; justify-self: start; }
+.person.focus .person-photo { box-shadow: 0 0 0 3px #FBCE00; }
+.who-btn .av + .who-tx, .who-btn .pair + .who-tx { margin-left: 0; }
+
+/* ---------- 挑選選手視窗 ---------- */
+.pick-search { width: 100%; min-height: 44px; padding: 0 14px; border-radius: 999px; margin: 6px 0 8px; }
+.pick-list { display: grid; gap: 4px; max-height: min(46vh, 380px); overflow-y: auto; padding: 2px; }
+.pick-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 14px; background: #fff; cursor: pointer; }
+.pick-row:hover { background: #eef4fb; }
+.pick-row[hidden] { display: none; }
+.pick-row input { width: 20px; height: 20px; flex: none; accent-color: #3071B9; }
+.pick-row.is-disabled { opacity: .55; cursor: not-allowed; }
+.pick-actions { align-items: center; }
+.pick-count { margin-right: auto; font-weight: 700; color: var(--sub, #666464); }
+
+/* ---------- 歷年成績（冠、亞、季軍） ---------- */
+.result-list { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; text-align: left; }
+.result-list li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 14px; background: #fff; }
+.result-list .medal { font-size: 22px; line-height: 1; }
+.result-list .res-tx { display: grid; flex: 1; min-width: 0; }
+.result-list .res-tx small { color: var(--sub, #666464); font-weight: 600; }
+.result-list li.place-1 { background: #fff6cf; }
+
+/* ---------- 存入成績視窗、成績紀錄（批次撤銷） ---------- */
+.save-summary { margin: 0; padding: 10px 14px; border-radius: 12px; background: #fff; font: inherit; font-weight: 600; white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
+.batch-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.batch-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: #fff; }
+.batch-list .batch-tx { display: grid; flex: 1; min-width: 0; }
+.batch-list small { color: var(--sub, #666464); font-weight: 600; }

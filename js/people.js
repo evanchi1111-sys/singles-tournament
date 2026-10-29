@@ -73,6 +73,11 @@ export function peopleApi(sb) {
       if (error) return {};
       return Object.fromEntries(data.map((p) => [p.name, p]));
     },
+    async remove(name) {
+      const { data, error } = await sb.from('people').delete().eq('name', name).select();
+      if (error) throw friendly(error);
+      if (!data || !data.length) throw new Error('沒有寫入權限，請重新登入主辦帳號');
+    },
     async save(name, patch) {
       const row = { name, ...patch, updated_at: new Date().toISOString() };
       const { data, error } = await sb.from('people').upsert(row, { onConflict: 'name' }).select();
@@ -93,6 +98,7 @@ export function demoPeopleApi(seed = {}) {
   const store = { ...seed };
   return {
     async load() { return JSON.parse(JSON.stringify(store)); },
+    async remove(name) { delete store[name]; },
     async save(name, patch) { store[name] = { ...(store[name] || {}), name, ...patch }; },
     upload(blob) {
       return new Promise((resolve, reject) => {
@@ -112,7 +118,7 @@ export function demoPeopleApi(seed = {}) {
 // onSave(patch)：patch = { unit, title, photo_url }；需自行處理上傳與錯誤，成功回傳 true 才會關閉視窗
 export function openPersonEditor({ openModal, person, onSave }) {
   openModal(`
-    <h2>編輯 ${escape(person.name)} 的資料</h2>
+    <h2>${person.name ? `編輯 ${escape(person.name)} 的資料` : "新增選手"}</h2>
     <form>
       <div class="photo-edit">
         <div class="photo-preview" id="photo-preview">${avatar(person, 'big')}</div>
@@ -122,6 +128,7 @@ export function openPersonEditor({ openModal, person, onSave }) {
           <p class="note">照片會自動置中裁成直式 3:4，並縮小後上傳。</p>
         </div>
       </div>
+      ${person.name ? "" : `<label>姓名<input name="name" maxlength="40" required placeholder="例：王小明" autocomplete="off"></label>`}
       <label>單位<input name="unit" maxlength="40" placeholder="例：新北市桌球隊" value="${escape(person.unit || '')}"></label>
       <label>頭銜<input name="title" maxlength="20" list="title-list" placeholder="例：種子選手" value="${escape(person.title || '')}"></label>
       <datalist id="title-list">${TITLE_SUGGESTIONS.map((t) => `<option value="${t}">`).join('')}</datalist>
@@ -159,8 +166,182 @@ export function openPersonEditor({ openModal, person, onSave }) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorEl.hidden = true;
-      const ok = await onSave({ unit: form.unit.value.trim() || null, title: form.title.value.trim() || null, blob: newBlob, removed });
+      const ok = await onSave({ name: form.name ? form.name.value.trim() : person.name, unit: form.unit.value.trim() || null, title: form.title.value.trim() || null, blob: newBlob, removed });
       if (ok) close();
     });
   });
+}
+
+// ---------------------------------------------------------------- 從選手資料庫挑選參賽選手
+
+// 選手資料庫頁的網址（找不到選手時，引導主辦到那裡新增）
+export function hubUrl() {
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  const demo = new URLSearchParams(location.search).has('demo');
+  return (local ? 'http://localhost:8769/' : '/players/') + (demo ? '?demo' : '');
+}
+
+// 挑選視窗：從選手資料庫勾選參賽選手。
+//   people：選手資料庫 { 姓名: 資料 }；extra：資料庫沒有、但已經登記在這個項目裡的姓名
+//   selected：目前已選的姓名；disabled：{ 姓名: 不能選的原因 }
+//   min / max：至少、最多要選幾位；onConfirm(姓名陣列)：回傳 true 才關閉視窗
+export function openPeoplePicker({ openModal, people, extra = [], selected = [], disabled = {}, title = '從選手資料庫挑選', hint = '', min = 0, max = Infinity, confirmLabel = '確定', onConfirm }) {
+  const names = [...new Set([...Object.keys(people || {}), ...extra, ...selected])].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  const chosen = new Set(selected);
+  const row = (name) => {
+    const p = profileOf(people, name);
+    const why = disabled[name];
+    return `<label class="pick-row ${why ? 'is-disabled' : ''}" data-name="${escape(name)}" data-search="${escape([name, p.unit, p.title].filter(Boolean).join(' ').toLowerCase())}">
+      <input type="checkbox" value="${escape(name)}" ${chosen.has(name) ? 'checked' : ''} ${why ? 'disabled' : ''}>
+      ${avatar(p, 'sm')}
+      <span class="who-tx"><span class="team">${escape(name)}</span><small class="who-sub">${escape([p.unit, p.title].filter(Boolean).join(' · ') || '（未填單位）')}${why ? ` ・${escape(why)}` : ''}</small></span>
+    </label>`;
+  };
+  openModal(`
+    <h2>${escape(title)}</h2>
+    ${hint ? `<p class="note">${escape(hint)}</p>` : ''}
+    <input class="pick-search" type="search" placeholder="搜尋姓名、單位或頭銜" aria-label="搜尋選手" autocomplete="off">
+    <div class="pick-list" role="group" aria-label="選手清單">
+      ${names.length ? names.map(row).join('') : '<p class="note">選手資料庫還沒有選手。</p>'}
+    </div>
+    <p class="note">找不到選手？<a href="${hubUrl()}" target="_blank" rel="noopener">到選手資料庫新增</a>，再回來重新開啟這個視窗。</p>
+    <p class="error" hidden></p>
+    <div class="modal-actions pick-actions">
+      <span class="pick-count"></span>
+      <button type="button" class="btn" data-close>取消</button>
+      <button type="button" class="btn primary" data-confirm>${escape(confirmLabel)}</button>
+    </div>`,
+  (modal, close) => {
+    const boxes = [...modal.querySelectorAll('.pick-list input[type=checkbox]')];
+    const count = modal.querySelector('.pick-count');
+    const errorEl = modal.querySelector('.error');
+    const refresh = () => {
+      const n = boxes.filter((b) => b.checked).length;
+      count.textContent = `已選 ${n} 位`;
+      // 已達上限時，其他選項暫時不能再勾
+      boxes.forEach((b) => { if (!disabled[b.value]) b.disabled = !b.checked && n >= max; });
+    };
+    refresh();
+    boxes.forEach((b) => b.addEventListener('change', refresh));
+    modal.querySelector('.pick-search').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      modal.querySelectorAll('.pick-row').forEach((r) => { r.hidden = !!q && !r.dataset.search.includes(q); });
+    });
+    modal.querySelector('[data-confirm]').addEventListener('click', async () => {
+      const picked = boxes.filter((b) => b.checked).map((b) => b.value);
+      errorEl.hidden = true;
+      if (picked.length < min) { errorEl.textContent = min === max ? `請選 ${min} 位` : `至少要選 ${min} 位`; errorEl.hidden = false; return; }
+      if (await onConfirm(picked)) close();
+    });
+  });
+}
+
+// ---------------------------------------------------------------- 選手歷年成績（年度冠、亞、季軍）
+
+export const SYSTEM_LABEL = { singles: '單打賽', doubles: '雙打賽', team: '團體賽' };
+export const DIVISION_LABEL = { competitive: '競賽組', fun: '歡樂成長組' };
+export const PLACE_LABEL = { 1: '冠軍', 2: '亞軍', 3: '季軍' };
+const MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+const groupResults = (rows) => {
+  const out = {};
+  for (const r of rows) (out[r.name] ||= []).push(r);
+  for (const list of Object.values(out)) list.sort((a, b) => b.year - a.year || a.place - b.place);
+  return out;
+};
+
+// 連到 Supabase 的版本：讀取全部成績（表格還沒建立時回傳空的），並依系統、組別、年度整批取代
+export function resultsApi(sb) {
+  return {
+    async load() {
+      const { data, error } = await sb.from('results').select('*');
+      return error ? {} : groupResults(data);
+    },
+    // 同一個比賽、組別、年度、賽事名稱重新存入時，先清掉舊紀錄再寫入新的（名次改了也不會留下舊資料）
+    async replace(system, division, year, event, rows) {
+      const del = await sb.from('results').delete().eq('system', system).eq('division', division).eq('year', year).eq('event', event);
+      if (del.error) throw friendly(del.error);
+      if (!rows.length) return;
+      const { error } = await sb.from('results').insert(rows.map((r) => ({ ...r, system, division, year, event })));
+      if (error) throw friendly(error);
+    },
+    async remove(id) {
+      const { data, error } = await sb.from('results').delete().eq('id', id).select();
+      if (error) throw friendly(error);
+      if (!data || !data.length) throw new Error('沒有寫入權限，請重新登入主辦帳號');
+    },
+    // 整批撤銷：刪掉同一個比賽、組別、年度、賽事名稱的所有成績
+    async removeBatch(system, division, year, event) {
+      const { data, error } = await sb.from('results').delete().eq('system', system).eq('division', division).eq('year', year).eq('event', event).select();
+      if (error) throw friendly(error);
+      if (!data || !data.length) throw new Error('沒有刪除到任何成績（可能沒有權限，請重新登入主辦帳號）');
+    },
+  };
+}
+
+// 示範模式的版本：只存在記憶體
+export function demoResultsApi(seed = []) {
+  let rows = seed.map((r, i) => ({ id: `demo-${i}`, event: '', ...r }));
+  const sameBatch = (r, system, division, year, event) => r.system === system && r.division === division && r.year === year && (r.event || '') === event;
+  return {
+    async load() { return groupResults(JSON.parse(JSON.stringify(rows))); },
+    async replace(system, division, year, event, list) {
+      rows = rows.filter((r) => !sameBatch(r, system, division, year, event));
+      list.forEach((r, i) => rows.push({ id: `demo-${Date.now()}-${i}`, ...r, system, division, year, event }));
+    },
+    async remove(id) { rows = rows.filter((r) => r.id !== id); },
+    async removeBatch(system, division, year, event) { rows = rows.filter((r) => !sameBatch(r, system, division, year, event)); },
+  };
+}
+
+// 把全部成績整理成「批次」：同一個比賽、組別、年度、賽事名稱算一批（選手資料庫頁用來整批撤銷）
+export function batchesOf(resultsMap) {
+  const map = new Map();
+  for (const list of Object.values(resultsMap || {})) {
+    for (const r of list) {
+      const key = [r.system, r.division, r.year, r.event || ''].join('|');
+      if (!map.has(key)) map.set(key, { system: r.system, division: r.division, year: r.year, event: r.event || '', count: 0 });
+      map.get(key).count++;
+    }
+  }
+  return [...map.values()].sort((a, b) => b.year - a.year || a.system.localeCompare(b.system));
+}
+
+// 存入成績的確認視窗：顯示要記錄的名單，並要求填賽事名稱與年度
+// summary：要記錄的名單文字（多行）；onConfirm({ year, event })：回傳 true 才關閉視窗
+export function openSaveResultsDialog({ openModal, summary, defaultYear = new Date().getFullYear(), onConfirm }) {
+  openModal(`
+    <h2>存入選手成績</h2>
+    <pre class="save-summary">${escape(summary)}</pre>
+    <form>
+      <label>賽事名稱（必填，例：2026 春季盃）<input name="event" maxlength="30" required autocomplete="off" placeholder="正式賽事的名稱"></label>
+      <label>年度<input name="year" type="number" min="2000" max="2100" required value="${defaultYear}"></label>
+      <p class="note">只在<b>正式比賽</b>結束後存入。測試請用示範模式（網址加 <code>?demo</code>）。存錯了可以到「選手資料庫」頁整批撤銷。</p>
+      <p class="error" hidden></p>
+      <div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary">存入成績</button></div>
+    </form>`,
+  (modal, close) => {
+    const form = modal.querySelector('form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const event = form.event.value.trim();
+      const year = Number(form.year.value);
+      const errorEl = form.querySelector('.error');
+      if (!event) { errorEl.textContent = '請填賽事名稱'; errorEl.hidden = false; return; }
+      if (!Number.isInteger(year) || year < 2000 || year > 2100) { errorEl.textContent = '年度請輸入 4 位數，例如 2026'; errorEl.hidden = false; return; }
+      if (await onConfirm({ year, event })) close();
+    });
+  });
+}
+
+// 選手檔案裡的「歷年成績」區塊。list 是這位選手的成績陣列；removable 為真時（主辦）每筆可刪除
+export function resultsHtml(list, { removable = false, title = '歷年成績' } = {}) {
+  const items = (list || []).map((r) => `
+    <li class="place-${r.place}">
+      <span class="medal">${MEDAL[r.place]}</span>
+      <span class="res-tx"><b>${r.year} 年${r.event ? ` ${escape(r.event)}` : ''}</b>
+        <small>${SYSTEM_LABEL[r.system] || ''}${r.division ? `・${DIVISION_LABEL[r.division] || r.division}` : ''}・${PLACE_LABEL[r.place]}${r.detail ? `・${escape(r.detail)}` : ''}</small></span>
+      ${removable ? `<button type="button" class="icon-btn" data-del-result="${escape(r.id)}" aria-label="刪除這筆成績">✕</button>` : ''}
+    </li>`).join('');
+  return `<h3 class="profile-h">${escape(title)}</h3>${items ? `<ul class="result-list">${items}</ul>` : '<p class="note">還沒有冠、亞、季軍紀錄。</p>'}`;
 }

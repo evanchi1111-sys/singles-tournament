@@ -69,3 +69,35 @@ begin
     on conflict (name) do nothing;
   end if;
 end $$;
+
+-- 6. 選手歷年成績（只記錄年度冠、亞、季軍）：由主辦在各比賽結束後按「存入選手成績」寫入
+create table if not exists public.results (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null check (char_length(btrim(name)) between 1 and 40),
+  year       int  not null check (year between 2000 and 2100),
+  system     text not null check (system in ('singles', 'doubles', 'team')),
+  division   text not null default '',
+  place      int  not null check (place between 1 and 3),
+  detail     text check (detail is null or char_length(detail) <= 40),  -- 雙打的搭檔、團體賽的隊名
+  event      text not null default '' check (char_length(event) <= 30),  -- 賽事名稱，例如「2026 春季盃」
+  created_at timestamptz not null default now()
+);
+-- 舊版（沒有賽事名稱）升級：補欄位，並把唯一條件改成「同一賽事」內每位選手只有一筆
+alter table public.results add column if not exists event text not null default '' check (char_length(event) <= 30);
+alter table public.results drop constraint if exists results_name_year_system_division_key;
+create unique index if not exists results_unique_idx on public.results (name, year, system, division, event);
+create index if not exists results_name_idx on public.results (name);
+
+alter table public.results enable row level security;
+drop policy if exists "results public read" on public.results;
+create policy "results public read" on public.results for select using (true);
+drop policy if exists "results organizer write" on public.results;
+create policy "results organizer write" on public.results for all to authenticated
+  using (public.people_is_organizer()) with check (public.people_is_organizer());
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'results') then
+    alter publication supabase_realtime add table public.results;
+  end if;
+end $$;
