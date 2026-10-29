@@ -1,5 +1,5 @@
 import { ORGANIZER_EMAIL } from './config.js';
-import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029h';
+import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029j';
 import {
   DIVISIONS, FORMATS, FINAL_FORMATS, BEST_OF, GROUP_LABELS,
   gameWinner, isStandardGame, matchOutcome, nextPow2,
@@ -7,7 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js';
 import { exportExcel, lineReport } from './export.js';
-import { avatar as avatarOf, titleChip as titleChipOf, openPersonEditor } from './people.js';
+import { avatar as avatarOf, titleChip as titleChipOf } from './people.js';
 
 const demo = new URLSearchParams(location.search).has('demo');
 const store = {
@@ -694,7 +694,6 @@ function renderSetup(v) {
         ${v.players.map((p, i) => `
           <li>
             <span class="seed-no">${i + 1}</span>${avatar(p, 'sm')}<span class="seed-name">${esc(p.name)}${subline(p) ? `<small class="who-sub">${subline(p)}</small>` : ''}</span>
-            <button class="icon-btn" data-action="edit-player" data-id="${p.id}" aria-label="編輯 ${esc(p.name)} 的資料" ${busy}>✎</button>
             <button class="icon-btn" data-action="move" data-id="${p.id}" data-dir="-1" aria-label="${esc(p.name)} 往前" ${busy || i === 0 ? 'disabled' : ''}>↑</button>
             <button class="icon-btn" data-action="move" data-id="${p.id}" data-dir="1" aria-label="${esc(p.name)} 往後" ${busy || i === n - 1 ? 'disabled' : ''}>↓</button>
             <button class="icon-btn del" data-action="delete-player" data-id="${p.id}" aria-label="刪除 ${esc(p.name)}" ${busy}>✕</button>
@@ -977,27 +976,8 @@ function openProfileModal(id) {
       ${rec.matches.length ? `<ul class="profile-matches">${rec.matches.map((m) => `
         <li class="${m.done ? (m.won ? 'w' : 'l') : 'live'}"><span>vs ${esc(nameOf(m.opp))}</span><b>${m.gw} : ${m.gl}</b><em>${m.done ? (m.won ? '勝' : '敗') : '進行中'}</em></li>`).join('')}</ul>`
         : '<p class="note">還沒有比賽紀錄。</p>'}
-      ${isOrganizer() ? `<div class="modal-actions"><button type="button" class="btn" data-edit>✎ 編輯資料</button></div>` : ''}
     </div>`,
-  (modal, close) => {
-    modal.querySelector('[data-edit]')?.addEventListener('click', () => { close(); openEditPlayerModal(id); });
-  });
-}
-
-// 編輯選手資料（單位、頭銜、照片）：存到共用的「選手資料庫」，同名選手在三個系統共用
-function openEditPlayerModal(id) {
-  const p = playerById(id);
-  if (!p) return;
-  openPersonEditor({
-    openModal,
-    person: p,
-    onSave: ({ unit, title, blob, removed }) => run(async () => {
-      let photo_url = p.photo_url || null;
-      if (blob) photo_url = await backend.uploadPhoto(blob);
-      else if (removed) photo_url = null;
-      await backend.savePerson(p.name, { unit, title, photo_url });
-    }, '選手資料已儲存'),
-  });
+  () => {});
 }
 
 // ---------------------------------------------------------------- 操作
@@ -1070,7 +1050,6 @@ const actions = {
   logout: async () => { await backend.signOut(); toast('已登出'); },
   score: ({ stage, code }) => openScoreModal(state.division, stage, code),
   profile: ({ id }) => openProfileModal(id),
-  'edit-player': ({ id }) => openEditPlayerModal(id),
   shuffle: () => {
     if (!confirm('隨機打亂種子順序？')) return;
     const list = playersOf(state.division);

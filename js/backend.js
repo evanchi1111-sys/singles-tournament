@@ -115,9 +115,6 @@ async function createSupabaseBackend() {
     async deletePlayer(id) {
       mustAffect(await sb.from('sg_players').delete().eq('id', id).select());
     },
-    // 選手資料庫（人員基本資料：單位、頭銜、照片），三個系統共用
-    async savePerson(name, patch) { await people.save(name, patch); },
-    uploadPhoto(blob) { return people.upload(blob); },
     async createMatches(rows) {
       if (rows.length) check(await sb.from('sg_matches').insert(rows));
     },
@@ -166,7 +163,7 @@ function createDemoBackend() {
       created_at: new Date(t0 + i).toISOString(),
     }));
   }
-  let user = null;
+  let user = (() => { try { return sessionStorage.getItem('demo_organizer') ? { email: ORGANIZER_EMAIL } : null; } catch { return null; } })(); // 示範模式：同一個分頁切換系統時保留主辦登入
   const dataListeners = new Set();
   const authListeners = new Set();
   const emit = () => setTimeout(() => dataListeners.forEach((fn) => fn()), 30);
@@ -186,10 +183,10 @@ function createDemoBackend() {
     onAuthChange(cb) { authListeners.add(cb); return () => authListeners.delete(cb); },
     async signIn(email, password) {
       if (email.toLowerCase() !== ORGANIZER_EMAIL.toLowerCase() || password !== DEMO_PASSWORD) throw new Error('帳號或密碼錯誤');
-      user = { email: ORGANIZER_EMAIL };
+      user = { email: ORGANIZER_EMAIL }; try { sessionStorage.setItem('demo_organizer', '1'); } catch { /* 忽略 */ }
       authListeners.forEach((fn) => fn(user));
     },
-    async signOut() { user = null; authListeners.forEach((fn) => fn(null)); },
+    async signOut() { user = null; try { sessionStorage.removeItem('demo_organizer'); } catch { /* 忽略 */ } authListeners.forEach((fn) => fn(null)); },
     async changePassword() { throw new Error('示範模式無法變更密碼'); },
     async updateSettings(patch) { requireOrganizer(); Object.assign(db.settings, patch); emit(); },
     async updateDivision(id, patch) { requireOrganizer(); Object.assign(db.divisions[id], patch); emit(); },
@@ -207,9 +204,6 @@ function createDemoBackend() {
       emit();
     },
     async deletePlayer(id) { requireOrganizer(); db.players = db.players.filter((p) => p.id !== id); emit(); },
-    // 選手資料庫（示範模式：只存在記憶體）
-    async savePerson(name, patch) { requireOrganizer(); await peopleDemo.save(name, patch); emit(); },
-    uploadPhoto(blob) { return peopleDemo.upload(blob); },
     async createMatches(rows) {
       requireOrganizer();
       rows.forEach((r) => db.matches.push({ id: uid(), games: [], p1_id: null, p2_id: null, grp: null, ...r }));
