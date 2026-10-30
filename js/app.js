@@ -7,7 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js?v=20261029u';
 import { exportExcel, lineReport } from './export.js';
-import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js?v=20261030h';
+import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog, staleSaved, staleNoteHtml } from './people.js?v=20261030i';
 
 const demo = new URLSearchParams(location.search).has('demo');
 const store = {
@@ -798,6 +798,7 @@ function renderAdmin() {
         </div>
         <p class="note">選手受傷或臨時離場時使用：他還沒打的對戰會判對手直接獲勝（棄權只計勝負，不計局數與得失分）。也可以在單場比分視窗按「棄權」。</p>
         ${groupHint}
+        ${staleNoteHtml(staleSaved(state.results, 'singles', v.div, (v.placings || []).filter((p) => p.place <= 3).map((p) => ({ name: nameOf(p.id), place: p.place }))))}
         <div class="actions wrap">${actions.join('')}</div>
       </section>
       ${renderCompetition(v, { admin: true })}`}
@@ -1259,7 +1260,7 @@ function exportCtx() {
         for (const r of res ? res.values() : []) {
           if (r.state !== 'done' && r.state !== 'live') continue;
           const o = matchOutcome(r.match.games, bestOfFor(v.cfg, r.match.stage));
-          matches.push({ stage: stageName, round: labelOf(r.match), p1: nameOf(r.p1), p2: nameOf(r.p2), score: `${o.w1} : ${o.w2}`,
+          matches.push({ stage: stageName, round: labelOf(r.match), p1: nameOf(r.p1), p2: nameOf(r.p2), score: o.walkover ? '棄權勝' : `${o.w1} : ${o.w2}`,
             games: o.walkover ? '棄權' : r.match.games.map((g) => `${g[0]}:${g[1]}`).join('、'), winner: r.winner ? nameOf(r.winner) : '（進行中）' });
         }
       };

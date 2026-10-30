@@ -287,7 +287,7 @@ export function demoResultsApi(seed = []) {
     async load() { return groupResults(JSON.parse(JSON.stringify(rows))); },
     async replace(system, division, year, event, list) {
       rows = rows.filter((r) => !sameBatch(r, system, division, year, event));
-      list.forEach((r, i) => rows.push({ id: `demo-${Date.now()}-${i}`, ...r, system, division, year, event }));
+      list.forEach((r, i) => rows.push({ id: `demo-${Date.now()}-${i}`, created_at: new Date().toISOString(), ...r, system, division, year, event }));
     },
     async remove(id) { rows = rows.filter((r) => r.id !== id); },
     async removeBatch(system, division, year, event) { rows = rows.filter((r) => !sameBatch(r, system, division, year, event)); },
@@ -330,6 +330,35 @@ export function demoArchiveApi(seed = []) {
     async removeBatch(system, division, year, event) { rows = rows.filter((r) => !same(r, system, division, year, event)); },
   };
 }
+
+// 存入成績後又改了比分：最近存入的成績和目前名次不同時，回傳 { event, year } 提醒主辦重新存入；一樣或沒有關聯時回傳 null
+// current：目前名次 [{ name, place }]（團體賽、雙打是每位選手一筆，和存入的格式相同）
+export function staleSaved(resultsMap, system, division, current) {
+  if (!current?.length) return null;
+  const batches = new Map();
+  for (const list of Object.values(resultsMap || {})) {
+    for (const r of list) {
+      if (r.system !== system || (r.division || '') !== (division || '')) continue;
+      const key = `${r.year}|${r.event || ''}`;
+      if (!batches.has(key)) batches.set(key, { year: r.year, event: r.event || '', at: '', pairs: new Set(), names: new Set() });
+      const b = batches.get(key);
+      b.pairs.add(`${r.name}|${r.place}`);
+      b.names.add(r.name);
+      if ((r.created_at || '') > b.at) b.at = r.created_at || '';
+    }
+  }
+  if (!batches.size) return null;
+  const latest = [...batches.values()].sort((a, b) => b.at.localeCompare(a.at) || b.year - a.year)[0];
+  const now = new Set(current.map((c) => `${c.name}|${c.place}`));
+  const same = latest.pairs.size === now.size && [...now].every((x) => latest.pairs.has(x));
+  if (same || !current.some((c) => latest.names.has(c.name))) return null; // 完全沒有相同選手，多半是另一場新比賽
+  return { event: latest.event, year: latest.year };
+}
+
+// 提醒文字（HTML）
+export const staleNoteHtml = (stale) => (stale
+  ? `<p class="banner warn">最近存入的「${escape(stale.event || '未命名賽事')}」（${stale.year}）成績和目前名次不同。如果是同一場比賽，請按「存入選手成績」重新存入（賽事名稱和年度要相同，才會取代舊的成績與封存）。</p>`
+  : '');
 
 // 把全部成績整理成「批次」：同一個比賽、組別、年度、賽事名稱算一批（選手資料庫頁用來整批撤銷）
 export function batchesOf(resultsMap) {

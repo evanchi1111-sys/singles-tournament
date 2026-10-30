@@ -1,5 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ORGANIZER_EMAIL } from './config.js';
-import { peopleApi, demoPeopleApi, resultsApi, demoResultsApi, archiveApi, demoArchiveApi } from './people.js?v=20261030h';
+import { peopleApi, demoPeopleApi, resultsApi, demoResultsApi, archiveApi, demoArchiveApi } from './people.js?v=20261030i';
 
 export const DEFAULT_DIVISION = {
   format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null,
