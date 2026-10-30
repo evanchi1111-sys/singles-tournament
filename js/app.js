@@ -257,6 +257,9 @@ const emptyState = (text) => `<div class="empty"><span aria-hidden="true">🏓</
 const COMPANY = '中龍鋼鐵';
 const siteTitle = () => (state.settings.title.includes(COMPANY) ? state.settings.title : `${COMPANY} ${state.settings.title}`);
 
+// 英雄榜（公開頁面，所有人都能看）：正式環境在選手資料庫網站底下；本機測試連到 8769 埠
+const hallHref = () => (['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:8769/hall.html' : '/players/hall.html') + (demo ? '?demo' : '');
+
 function renderHeader() {
   return `
     <header class="topbar">
@@ -270,7 +273,7 @@ function renderHeader() {
               : `<p class="live off"><span class="dot" aria-hidden="true"></span>重新連線中，每 15 秒自動更新</p>`}
           </div>
         </div>
-        ${isOrganizer() ? `<button class="btn small" data-action="logout">登出主辦</button>` : ''}
+        <div class="who"><a class="hall-chip" href="${hallHref()}">🏆 英雄榜</a>${isOrganizer() ? `<button class="btn small" data-action="logout">登出主辦</button>` : ''}</div>
       </div>
       <nav class="container viewtabs three" aria-label="功能">
         <button class="viewtab ${state.view === 'results' ? 'on' : ''}" data-action="view" data-view="results" aria-pressed="${state.view === 'results'}">賽程與成績</button>

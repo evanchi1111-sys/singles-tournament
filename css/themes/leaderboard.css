@@ -197,3 +197,15 @@ input, select, textarea { border: 1.5px solid #c5d5e6; border-radius: 14px; back
 .pcard-tx small { font-size: 11px; }
 .av.big { width: 72px; height: 72px; font-size: 24px; border-width: 3px; }
 @media (min-width: 960px) { .player-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 12px; } }
+
+/* 英雄榜入口（所有人可見） */
+.hall-strip { display: flex; justify-content: flex-end; padding-bottom: 10px; }
+.hall-strip a { color: #fff; font-weight: 800; font-size: 13px; text-decoration: none; background: rgba(255, 255, 255, .2); padding: 5px 14px; border-radius: 999px; }
+.hall-strip a:hover { background: rgba(255, 255, 255, .32); }
+.hall-strip a:focus-visible { outline: 3px solid #FBCE00; outline-offset: 2px; }
+
+/* 英雄榜入口改放在標題旁（取代下方一行小按鈕） */
+.hall-chip { color: #fff; font-weight: 800; font-size: 13px; text-decoration: none; background: rgba(255, 255, 255, .22); padding: 6px 13px; border-radius: 999px; white-space: nowrap; }
+.hall-chip:hover { background: rgba(255, 255, 255, .34); }
+.hall-chip:focus-visible { outline: 3px solid #FBCE00; outline-offset: 2px; }
+.hall-strip { display: none; }
