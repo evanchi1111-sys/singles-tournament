@@ -7,6 +7,7 @@ const SITES = [
   { key: 'doubles', label: '雙打賽', path: '/DSC-table-tennis/', dev: 8767 },
   { key: 'team', label: '團體賽', path: '/team-lineup/', dev: 8768 },
   { key: 'players', label: '選手資料庫', path: '/players/', dev: 8769 },
+  { key: 'hall', label: '英雄榜', path: '/players/hall.html', dev: 8769, file: 'hall.html' },
 ];
 
 if (!document.querySelector('.sitenav')) {
@@ -19,7 +20,7 @@ if (!document.querySelector('.sitenav')) {
   nav.hidden = true; // 預設隱藏，確認是主辦才顯示
   nav.setAttribute('aria-label', '主辦：切換系統');
   nav.innerHTML = `<div class="sitenav-inner">${SITES.map((s) => {
-    const href = (local ? `http://localhost:${s.dev}/` : s.path) + (demo ? '?demo' : '');
+    const href = (local ? `http://localhost:${s.dev}/${s.file || ''}` : s.path) + (demo ? '?demo' : '');
     return `<a href="${href}" class="${s.key === current ? 'on' : ''}" ${s.key === current ? 'aria-current="page"' : ''}>${s.label}</a>`;
   }).join('')}</div>`;
   document.body.prepend(nav);
