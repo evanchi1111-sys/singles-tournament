@@ -185,3 +185,15 @@ input, select, textarea { border: 1.5px solid #c5d5e6; border-radius: 14px; back
 .r2 { background: #666464; }
 .r3 { background: #3071B9; }
 .mbox.live, .match.playing { box-shadow: 0 0 0 2px #FBCE00, 0 0 0 4px rgba(251, 206, 0, .25); }
+
+/* ================= 照片縮小（頒獎台、選手名單／資料庫卡片、個人檔案大頭貼） ================= */
+.pcard-photo, .person-photo { aspect-ratio: 1 / 1; }
+.pod-photo, .pod-1 .pod-photo { aspect-ratio: 1 / 1; }
+.pod-1 .pod-photo { aspect-ratio: 1 / 1.1; }
+.podium { grid-template-columns: 1fr 1.1fr 1fr; gap: 8px; max-width: 300px; margin-left: auto; margin-right: auto; }
+.player-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.pcard-tx { padding: 6px 8px 8px; }
+.pcard-tx b { font-size: 14px; }
+.pcard-tx small { font-size: 11px; }
+.av.big { width: 72px; height: 72px; font-size: 24px; border-width: 3px; }
+@media (min-width: 960px) { .player-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 12px; } }
