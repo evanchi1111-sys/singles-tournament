@@ -1,5 +1,5 @@
 import { ORGANIZER_EMAIL } from './config.js';
-import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261029q';
+import { createBackend, isConfigured, DEFAULT_DIVISION } from './backend.js?v=20261030h';
 import {
   DIVISIONS, FORMATS, FINAL_FORMATS, BEST_OF, GROUP_LABELS,
   gameWinner, isStandardGame, matchOutcome, nextPow2, WALKOVER, isWalkover, walkoverSide,
@@ -7,7 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js?v=20261029u';
 import { exportExcel, lineReport } from './export.js';
-import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js';
+import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog } from './people.js?v=20261030h';
 
 const demo = new URLSearchParams(location.search).has('demo');
 const store = {
@@ -1111,10 +1111,27 @@ function saveResults() {
   openSaveResultsDialog({
     openModal,
     summary,
-    onConfirm: ({ year, event }) => run(
-      () => backend.saveResults('singles', v.div, year, event, top.map((p) => ({ name: nameOf(p.id), place: p.place, detail: null }))),
-      `已存入「${event}」${DIVISIONS[v.div]}冠亞季軍`),
+    onConfirm: async ({ year, event }) => {
+      let archived = true;
+      const ok = await run(async () => {
+        const res = await backend.saveResults('singles', v.div, year, event, top.map((p) => ({ name: nameOf(p.id), place: p.place, detail: null })), archiveSnapshot(v));
+        archived = res?.archived !== false;
+      });
+      if (ok) toast(archived ? `已存入「${event}」${DIVISIONS[v.div]}冠亞季軍，並封存完整結果` : '成績已存入，但完整結果沒有封存成功（請主辦在 Supabase 執行 supabase/archive.sql）', archived ? 'ok' : 'error');
+      return ok;
+    },
   });
+}
+
+// 賽事封存：這個組別目前的排名表與每場比分（整理成英雄榜可以直接顯示的格式）
+function archiveSnapshot(v) {
+  const d = exportCtx().divisions.find((x) => x.label === DIVISIONS[v.div]);
+  return {
+    formatLabel: d.formatLabel,
+    placings: d.placings,
+    tables: d.tables.map((t) => ({ title: t.title, head: ['名次', '選手', '勝', '敗', '局數', '得失分', '判定依據'], rows: t.rows })),
+    matches: d.matches,
+  };
 }
 
 // 從選手資料庫勾選這個組別的參賽選手：新勾的加入名單（排在最後），取消勾選的移除

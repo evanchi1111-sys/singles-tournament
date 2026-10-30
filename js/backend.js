@@ -1,5 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ORGANIZER_EMAIL } from './config.js';
-import { peopleApi, demoPeopleApi, resultsApi, demoResultsApi } from './people.js';
+import { peopleApi, demoPeopleApi, resultsApi, demoResultsApi, archiveApi, demoArchiveApi } from './people.js?v=20261030h';
 
 export const DEFAULT_DIVISION = {
   format: 'single', best_of: 3, group_count: 2, advance_count: 2, final_format: 'single', final_best_of: null,
@@ -53,6 +53,7 @@ async function createSupabaseBackend() {
   const now = () => new Date().toISOString();
   const people = peopleApi(sb);
   const results = resultsApi(sb);
+  const archive = archiveApi(sb);
 
   return {
     async load() {
@@ -117,7 +118,12 @@ async function createSupabaseBackend() {
       if (rows.length) mustAffect(await sb.from('sg_players').upsert(rows).select());
     },
     // 把冠、亞、季軍存入選手歷年成績（同一比賽、組別、年度會整批取代）
-    async saveResults(system, division, year, event, rows) { await results.replace(system, division, year, event, rows); },
+    // 成績存入後再封存完整結果；封存失敗（例如還沒建立資料表）不影響成績，回傳 archived: false 讓畫面提醒
+    async saveResults(system, division, year, event, rows, snapshot) {
+      await results.replace(system, division, year, event, rows);
+      if (!snapshot) return { archived: false };
+      try { await archive.replace(system, division, year, event, snapshot); return { archived: true }; } catch { return { archived: false }; }
+    },
     async deletePlayer(id) {
       mustAffect(await sb.from('sg_players').delete().eq('id', id).select());
     },
@@ -149,6 +155,7 @@ function createDemoBackend() {
   const DEMO_PASSWORD = 'demo1234';
   const t0 = Date.now();
   const peopleDemo = demoPeopleApi();
+  const archiveDemo = demoArchiveApi();
   const resultsDemo = demoResultsApi([
     { name: '陳志明', year: 2025, system: 'singles', division: 'competitive', place: 1, detail: null },
     { name: '林建宏', year: 2025, system: 'singles', division: 'competitive', place: 2, detail: null },
@@ -188,7 +195,7 @@ function createDemoBackend() {
     isDemo: true,
     demoPassword: DEMO_PASSWORD,
     async load() { return { ...clone(db), people: await peopleDemo.load(), results: await resultsDemo.load() }; },
-    async saveResults(system, division, year, event, rows) { requireOrganizer(); await resultsDemo.replace(system, division, year, event, rows); emit(); },
+    async saveResults(system, division, year, event, rows, snapshot) { requireOrganizer(); await resultsDemo.replace(system, division, year, event, rows); if (snapshot) await archiveDemo.replace(system, division, year, event, snapshot); emit(); return { archived: !!snapshot }; },
     subscribe(onChange, onStatus = () => {}) {
       dataListeners.add(onChange);
       setTimeout(() => onStatus('SUBSCRIBED'), 0);

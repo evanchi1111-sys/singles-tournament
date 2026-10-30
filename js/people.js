@@ -294,6 +294,43 @@ export function demoResultsApi(seed = []) {
   };
 }
 
+// ---------------------------------------------------------------- 賽事封存（完整比賽結果）
+// 存入成績時順便留一份整場比賽的結果（排名表、每場比分）：event_archives 資料表，英雄榜點賽事可展開查看。
+// snapshot：{ formatLabel, placings: [{ place, name }], tables: [{ title, head: [], rows: [[]] }], matches: [{ stage, round, p1, p2, score, games, winner, lines? }] }
+
+export function archiveApi(sb) {
+  const batch = (q, system, division, year, event) => q.eq('system', system).eq('division', division).eq('year', year).eq('event', event);
+  return {
+    async load() {
+      const { data, error } = await sb.from('event_archives').select('*');
+      return error ? [] : data;
+    },
+    // 同一個比賽、組別、年度、賽事名稱重新存入時取代舊的封存
+    async replace(system, division, year, event, snapshot) {
+      const del = await batch(sb.from('event_archives').delete(), system, division, year, event);
+      if (del.error) throw friendly(del.error);
+      const { error } = await sb.from('event_archives').insert({ system, division, year, event, snapshot });
+      if (error) throw friendly(error);
+    },
+    async removeBatch(system, division, year, event) {
+      await batch(sb.from('event_archives').delete(), system, division, year, event);
+    },
+  };
+}
+
+export function demoArchiveApi(seed = []) {
+  let rows = seed.map((r, i) => ({ id: `demo-a${i}`, event: '', ...r }));
+  const same = (r, system, division, year, event) => r.system === system && r.division === division && r.year === year && (r.event || '') === event;
+  return {
+    async load() { return JSON.parse(JSON.stringify(rows)); },
+    async replace(system, division, year, event, snapshot) {
+      rows = rows.filter((r) => !same(r, system, division, year, event));
+      rows.push({ id: `demo-a${Date.now()}`, system, division, year, event, snapshot: JSON.parse(JSON.stringify(snapshot)) });
+    },
+    async removeBatch(system, division, year, event) { rows = rows.filter((r) => !same(r, system, division, year, event)); },
+  };
+}
+
 // 把全部成績整理成「批次」：同一個比賽、組別、年度、賽事名稱算一批（選手資料庫頁用來整批撤銷）
 export function batchesOf(resultsMap) {
   const map = new Map();
@@ -316,7 +353,7 @@ export function openSaveResultsDialog({ openModal, summary, defaultYear = new Da
     <form>
       <label>賽事名稱（必填，例：2026 春季盃）<input name="event" maxlength="30" required autocomplete="off" placeholder="正式賽事的名稱"></label>
       <label>年度<input name="year" type="number" min="2000" max="2100" required value="${defaultYear}"></label>
-      <p class="note">只在<b>正式比賽</b>結束後存入。測試請用示範模式（網址加 <code>?demo</code>）。存錯了可以到「選手資料庫」頁整批撤銷。</p>
+      <p class="note">只在<b>正式比賽</b>結束後存入。測試請用示範模式（網址加 <code>?demo</code>）。存入時會一併封存整場比賽的完整結果（排名與每場比分），英雄榜可以展開查看。存錯了可以到「選手資料庫」頁整批撤銷。</p>
       <p class="error" hidden></p>
       <div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary">存入成績</button></div>
     </form>`,
