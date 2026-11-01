@@ -253,9 +253,9 @@ app.addEventListener('focusout', () => {
 
 const emptyState = (text) => `<div class="empty"><span aria-hidden="true">🏓</span><p>${esc(text)}</p></div>`;
 
-// 網站標題前面固定加上公司名；主辦若已在標題裡寫了「中龍鋼鐵」就不重複加
-const COMPANY = '中龍鋼鐵';
-const siteTitle = () => (state.settings.title.includes(COMPANY) ? state.settings.title : `${COMPANY} ${state.settings.title}`);
+// 網站標題前面固定加上公司名；主辦若已在標題開頭寫了「中龍鋼鐵」，會換成統一的名稱，不重複
+const COMPANY = '中龍鋼鐵桌球社';
+const siteTitle = () => `${COMPANY} ${state.settings.title.replace(/^中龍鋼鐵(桌球社)?\s*/, '').replace(/^桌球\s*/, '')}`;
 
 // 英雄榜（公開頁面，所有人都能看）：正式環境在選手資料庫網站底下；本機測試連到 8769 埠
 const hallHref = () => (['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:8769/hall.html' : '/players/hall.html') + (demo ? '?demo' : '');
