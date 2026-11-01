@@ -795,11 +795,6 @@ function renderAdmin() {
         <h3>${DIVISIONS[v.div]} 賽程管理</h3>
         <p class="note">點選對戰方框即可登錄或修改比分。</p>
         ${finalSettings}
-        <div class="inline-form">
-          <select id="wd-player" aria-label="退賽的選手"><option value="">選手退賽…</option>${v.players.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
-          <button class="btn" data-action="withdraw" ${busy}>判定退賽</button>
-        </div>
-        <p class="note">選手受傷或臨時離場時使用：他還沒打的對戰會判對手直接獲勝（棄權只計勝負，不計局數與得失分）。也可以在單場比分視窗按「棄權」。</p>
         ${groupHint}
         ${staleNoteHtml(staleSaved(state.results, 'singles', v.div, (v.placings || []).filter((p) => p.place <= 3).map((p) => ({ name: nameOf(p.id), place: p.place }))))}
         <div class="actions wrap">${actions.join('')}</div>
@@ -882,10 +877,6 @@ function openScoreModal(div, stage, code) {
          <div class="game-row" data-row="${i}"><span class="game-label">第 ${i + 1} 局</span>${cell(i, 0)}<span class="colon">:</span>${cell(i, 1)}<span class="row-note"></span></div>`).join('')}
      </div>
      <p class="score-result">${woNow ? `目前判定：<b>${esc(woNow === 1 ? n1 : n2)}</b> 棄權，${esc(woNow === 1 ? n2 : n1)} 直接獲勝。` : ''}</p>
-     <div class="modal-actions wo-actions">
-       <button type="button" class="btn" data-wo="1">${esc(n1)} 棄權</button>
-       <button type="button" class="btn" data-wo="2">${esc(n2)} 棄權</button>
-     </div>
      <div class="modal-actions">
        <button type="button" class="btn" data-clear>清除比分</button>
        <button type="button" class="btn" data-close>取消</button>
@@ -974,10 +965,6 @@ function openScoreModal(div, stage, code) {
         }
         commit(ev.games, ev.decided ? (ev.w1 > ev.w2 ? info.p1 : info.p2) : null);
       });
-      modal.querySelectorAll('[data-wo]').forEach((btn) => btn.addEventListener('click', () => {
-        const side = Number(btn.dataset.wo);
-        commit([WALKOVER[side]], side === 1 ? info.p2 : info.p1);
-      }));
       draw();
       [...modal.querySelectorAll('.game-row:not([hidden]) .pt-input')].find((el) => el.value === '')?.focus();
     }
@@ -1189,21 +1176,6 @@ const actions = {
   },
   generate,
   'make-final': makeFinal,
-  // 選手退賽：目前還沒打完、雙方都已確定的對戰，全部判對手直接獲勝（已打完的比分保留）
-  withdraw: () => {
-    const id = document.getElementById('wd-player')?.value;
-    if (!id) return toast('請先選擇退賽的選手', 'error');
-    const v = divisionView(state.division);
-    const todo = [v.res, v.groupRes, v.finalRes].filter(Boolean)
-      .flatMap((res) => [...res.values()])
-      .filter((r) => (r.state === 'ready' || r.state === 'live') && (r.p1 === id || r.p2 === id));
-    if (!todo.length) return toast(`${nameOf(id)} 目前沒有待打的對戰；之後輪到的對戰，請在該場按「棄權」`, 'error');
-    const list = todo.map((r) => `・${nameOf(r.p1)} 對 ${nameOf(r.p2)}`).join('\n');
-    if (!confirm(`判定「${nameOf(id)}」退賽？\n以下 ${todo.length} 場判對手直接獲勝：\n${list}\n\n已打完的比分會保留；之後才輪到的對戰請在該場按「棄權」。`)) return;
-    run(async () => {
-      for (const r of todo) await backend.updateMatch(r.match.id, { games: [WALKOVER[r.p1 === id ? 1 : 2]], p1_id: r.p1, p2_id: r.p2 });
-    }, `已判定 ${nameOf(id)} 退賽`);
-  },
   'make-playoffs': () => {
     const v = divisionView(state.division);
     if (!v.canMakePlayoffs) return;
