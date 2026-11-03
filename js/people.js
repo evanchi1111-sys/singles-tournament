@@ -355,6 +355,31 @@ export function staleSaved(resultsMap, system, division, current) {
   return { event: latest.event, year: latest.year };
 }
 
+// 這次比賽的名次是否「已經存入成績」：存入的某一批名單和目前名次完全相同 → 回傳 { event, year }，否則 null。
+// 存入成績代表比賽結束，比分與賽程不能再改；要修正得先到「選手資料庫」撤銷那一批成績（撤銷後這裡就解除鎖定）。
+export function savedBatch(resultsMap, system, division, current) {
+  if (!current?.length) return null;
+  const batches = new Map();
+  for (const list of Object.values(resultsMap || {})) {
+    for (const r of list) {
+      if (r.system !== system || (r.division || '') !== (division || '')) continue;
+      const key = `${r.year}|${r.event || ''}`;
+      if (!batches.has(key)) batches.set(key, { year: r.year, event: r.event || '', pairs: new Set() });
+      batches.get(key).pairs.add(`${r.name}|${r.place}`);
+    }
+  }
+  const now = new Set(current.map((c) => `${c.name}|${c.place}`));
+  for (const b of batches.values()) {
+    if (b.pairs.size === now.size && [...now].every((x) => b.pairs.has(x))) return { event: b.event, year: b.year };
+  }
+  return null;
+}
+
+// 鎖定提示（HTML）
+export const lockedNoteHtml = (b) => (b
+  ? `<p class="banner info">🔒 「${escape(b.event || '未命名賽事')}」（${b.year}）的成績已存入，比賽已結束，比分與內容不能再修改。如需修正，請先到「選手資料庫」頁撤銷這一批成績。</p>`
+  : '');
+
 // 提醒文字（HTML）
 export const staleNoteHtml = (stale) => (stale
   ? `<p class="banner warn">最近存入的「${escape(stale.event || '未命名賽事')}」（${stale.year}）成績和目前名次不同。如果是同一場比賽，請按「存入選手成績」重新存入（賽事名稱和年度要相同，才會取代舊的成績與封存）。</p>`

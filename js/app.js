@@ -8,7 +8,7 @@ import {
 } from './bracket.js?v=20261029u';
 import { exportExcel, lineReport } from './export.js';
 import { loadDesk, syncDesk, fillTables, assign as deskAssign, release as deskRelease, renderDesk } from './desk.js?v=20261103d';
-import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog, staleSaved, staleNoteHtml } from './people.js?v=20261030i';
+import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog, staleSaved, staleNoteHtml, savedBatch, lockedNoteHtml } from './people.js?v=20261103a';
 
 const demo = new URLSearchParams(location.search).has('demo');
 const store = {
@@ -120,6 +120,18 @@ async function run(task, successMessage) {
 }
 
 // ---------------------------------------------------------------- 每個組別的推算資料
+
+// 存入選手成績＝這次比賽已結束：存入的名次和目前名次相同時，該組別的比分、賽程、名單都鎖定
+const lockedBatch = (div) => {
+  const v = divisionView(div);
+  const top = (v.placings || []).filter((p) => p.place <= 3).map((p) => ({ name: nameOf(p.id), place: p.place }));
+  return savedBatch(state.results, 'singles', div, top);
+};
+function guardLocked(div) {
+  const b = lockedBatch(div);
+  if (b) toast(`「${b.event || '這場比賽'}」的成績已存入，比賽已結束，不能再修改。如需修正，請先到「選手資料庫」撤銷這一批成績。`, 'error');
+  return !!b;
+}
 
 function divisionView(div) {
   const cfg = state.divisions[div];
@@ -757,6 +769,7 @@ function renderSetup(v) {
 function renderAdmin() {
   if (!isOrganizer()) return renderAdminLogin();
   const v = divisionView(state.division);
+  const locked = lockedBatch(v.div);
   const busy = state.busy ? 'disabled' : '';
   const actions = [];
   if (v.phase === 'group' && v.cfg.format === 'groups') {
@@ -770,9 +783,10 @@ function renderAdmin() {
   if (v.phase === 'final') actions.push(`<button class="btn" data-action="reset-final" ${busy}>取消總決賽，回到預賽</button>`);
   if ((v.placings || []).some((p) => p.place <= 3)) actions.push(`<button class="btn primary" data-action="save-results" ${busy}>🏅 存入選手成績（冠亞季軍）</button>`);
   if (v.phase !== 'setup') actions.push(`<button class="btn danger" data-action="reset" ${busy}>重設本組賽程</button>`);
+  if (locked) actions.length = 0;
   const minGroup = v.groups ? Math.min(...v.groups.map((g) => g.ids.length)) : 0;
   // 總決賽產生前，晉級人數與總決賽賽制都還可以調整
-  const finalSettings = v.phase === 'group' && v.cfg.format === 'groups' ? `
+  const finalSettings = !locked && v.phase === 'group' && v.cfg.format === 'groups' ? `
     <div class="grid-form form">
       <label>每組晉級人數<select data-change="div-setting" data-field="advance_count">
         ${Array.from({ length: Math.max(1, minGroup - 1) }, (_, i) => i + 1).map((k) => `<option value="${k}" ${v.cfg.advance_count === k ? 'selected' : ''}>前 ${k} 名</option>`).join('')}
@@ -783,10 +797,10 @@ function renderAdmin() {
       ${finalBestOfSelect(v.cfg)}
       ${finalExtrasSelects(v.cfg)}
     </div>` : '';
-  const rrHint = v.cfg.format !== 'roundrobin' ? '' : v.rrNeedDraw
+  const rrHint = locked || v.cfg.format !== 'roundrobin' ? '' : v.rrNeedDraw
     ? '<p class="banner warn">前三名有戰績完全相同的選手，請先在排名表填入抽籤順位，名次才會公布。</p>'
     : '';
-  const groupHint = v.cfg.format === 'roundrobin' ? rrHint : v.phase === 'group'
+  const groupHint = locked ? '' : v.cfg.format === 'roundrobin' ? rrHint : v.phase === 'group'
     ? (!v.groupsDone ? '<p class="note">預賽全部打完後，才能產生總決賽。產生前仍可調整晉級人數與總決賽賽制。</p>'
       : v.unresolved.length ? `<p class="banner warn">${v.unresolved.join('、')} 組有戰績完全相同的選手${v.cfg.final_format === 'single' ? '，會影響晉級或總決賽的種子位置' : '，會影響誰晉級'}，請先在該組排名表填入抽籤順位。</p>` : '')
     : v.phase === 'final' && v.hasPlayoffs && !v.playoffs.length
@@ -798,13 +812,13 @@ function renderAdmin() {
     ${v.phase === 'setup' ? renderSetup(v) : `
       <section class="card">
         <h3>${DIVISIONS[v.div]} 賽程管理</h3>
-        <p class="note">點選對戰方框即可登錄或修改比分。</p>
+        ${locked ? lockedNoteHtml(locked) : '<p class="note">點選對戰方框即可登錄或修改比分。</p>'}
         ${finalSettings}
         ${groupHint}
-        ${staleNoteHtml(staleSaved(state.results, 'singles', v.div, (v.placings || []).filter((p) => p.place <= 3).map((p) => ({ name: nameOf(p.id), place: p.place }))))}
+        ${locked ? '' : staleNoteHtml(staleSaved(state.results, 'singles', v.div, (v.placings || []).filter((p) => p.place <= 3).map((p) => ({ name: nameOf(p.id), place: p.place }))))}
         <div class="actions wrap">${actions.join('')}</div>
       </section>
-      ${renderCompetition(v, { admin: true })}`}
+      ${renderCompetition(v, { admin: !locked })}`}
     <section class="card">
       <h3>大會設定與匯出</h3>
       <form class="inline-form" data-form="title">
@@ -907,6 +921,7 @@ function openModal(html, onReady) {
 }
 
 function openScoreModal(div, stage, code) {
+  if (guardLocked(div)) return;
   const v = divisionView(div);
   const res = stage === 'main' ? v.res : stage === 'group' ? v.groupRes : v.finalRes;
   const info = res.get(code);
@@ -1316,6 +1331,16 @@ const actions = {
   },
 };
 
+// 成績存入後鎖定：改賽程、重設、清除一律擋下（畫面上的按鈕也已經隱藏，這裡是第二道保險）
+for (const key of ['generate', 'make-final', 'make-playoffs', 'cancel-playoffs', 'reset-final', 'reset']) {
+  const fn = actions[key];
+  actions[key] = (d, el) => (guardLocked(state.division) ? undefined : fn(d, el));
+}
+{
+  const wipe = actions.wipe;
+  actions.wipe = (d, el) => (Object.keys(DIVISIONS).some((div) => guardLocked(div)) ? undefined : wipe(d, el));
+}
+
 function exportCtx() {
   return {
     title: state.settings.title,
@@ -1359,6 +1384,7 @@ app.addEventListener('change', (e) => {
   const el = e.target.closest('[data-change]');
   if (!el) return;
   const kind = el.dataset.change;
+  if (['div-setting', 'player-group', 'draw'].includes(kind) && guardLocked(state.division)) { render(); return; }
   if (kind === 'me') {
     state.me = el.value;
     store.set('me', el.value);
