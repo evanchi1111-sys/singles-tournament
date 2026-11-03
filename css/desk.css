@@ -84,3 +84,6 @@ main.container.view-desk { display: block; }
   .dk-act .btn, .dk-table > .btn { min-height: 32px; padding: 2px 12px; }
   .dk-item { padding: 8px 10px; }
 }
+
+.dk-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.dk-top h2 { margin: 0; font-size: 20px; }

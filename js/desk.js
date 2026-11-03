@@ -1,9 +1,10 @@
-// 記分台：球桌場地圖 ＋ 待賽清單。
+// 記分台：球桌場地圖 ＋ 待賽清單（單打、雙打、團體三個比賽系統共用，四個專案各放一份相同的檔案）。
+// 各系統把自己的對戰轉成「項目」{ key, div, round, playable, done, ids }：
+//   playable＝雙方已確定且還沒打完；done＝已完賽；ids＝這場的所有參賽者（單打 2 人、雙打 4 人、團體 2 隊），用來算休息與避開同時上場。
 // 兩個組別的場次放在同一份清單，系統依「選手剛打完幾場」建議下一場；主辦可以隨時手動調整。
 // 桌況（哪張桌子在打哪一場、出賽紀錄）只存在記分的這台電腦（localStorage），不寫進資料庫。
 
 export const DESK_DEFAULT = { tables: 5, rest: 1, auto: true, assign: {}, history: [], pins: [], filter: 'all' };
-export const keyOf = (div, stage, code) => `${div}|${stage}|${code}`;
 
 export function loadDesk(raw) {
   try {
@@ -13,23 +14,6 @@ export function loadDesk(raw) {
     return { ...DESK_DEFAULT, assign: {}, history: [], pins: [] };
   }
 }
-
-// 所有對戰（任何狀態）：key → { key, div, stage, code, info, round }
-export function collectInfos(views) {
-  const map = new Map();
-  for (const v of Object.values(views)) {
-    for (const [stage, res] of [['main', v.res], ['group', v.groupRes], ['final', v.finalRes]]) {
-      if (!res) continue;
-      for (const [code, info] of res) {
-        const key = keyOf(v.div, stage, code);
-        map.set(key, { key, div: v.div, stage, code, info, round: info.match?.round ?? 1 });
-      }
-    }
-  }
-  return map;
-}
-
-const playable = (it) => (it.info.state === 'ready' || it.info.state === 'live') && it.info.p1 && it.info.p2;
 
 // 這位選手距離上次排上桌過了幾場（從沒打過回傳很大的數字）
 function gapOf(desk, pid) {
@@ -43,7 +27,7 @@ function busyIds(desk, infos) {
   const ids = new Set();
   for (const key of Object.values(desk.assign)) {
     const it = infos.get(key);
-    if (it) { ids.add(it.info.p1); ids.add(it.info.p2); }
+    if (it) it.ids.forEach((id) => ids.add(id));
   }
   return ids;
 }
@@ -57,17 +41,13 @@ export function buildQueue(desk, infos) {
   // 每位選手還有幾場沒打（含正在桌上的）：剩得多的人優先排，才不會最後剩幾位選手只能連續上場
   const load = new Map();
   for (const it of infos.values()) {
-    if (!playable(it)) continue;
-    for (const id of [it.info.p1, it.info.p2]) load.set(id, (load.get(id) || 0) + 1);
+    if (!it.playable) continue;
+    for (const id of it.ids) load.set(id, (load.get(id) || 0) + 1);
   }
-  const list = [...infos.values()].filter((it) => playable(it) && !onTable.has(it.key)).map((it, idx) => {
-    const g1 = gapOf(desk, it.info.p1);
-    const g2 = gapOf(desk, it.info.p2);
-    const gap = Math.min(g1, g2);
-    const tired = [];
-    if (g1 < need) tired.push(it.info.p1);
-    if (g2 < need) tired.push(it.info.p2);
-    return { ...it, idx, gap, load: (load.get(it.info.p1) || 0) + (load.get(it.info.p2) || 0), tired, ok: tired.length === 0, blocked: busy.has(it.info.p1) || busy.has(it.info.p2), pinned: desk.pins.includes(it.key) };
+  const list = [...infos.values()].filter((it) => it.playable && !onTable.has(it.key)).map((it, idx) => {
+    const gaps = it.ids.map((id) => gapOf(desk, id));
+    const tired = it.ids.filter((id, k) => gaps[k] < need);
+    return { ...it, idx, gap: Math.min(...gaps), load: it.ids.reduce((sum, id) => sum + (load.get(id) || 0), 0), tired, ok: tired.length === 0, blocked: it.ids.some((id) => busy.has(id)), pinned: desk.pins.includes(it.key) };
   });
   list.sort((a, b) => (a.blocked - b.blocked)
     || (b.pinned - a.pinned)
@@ -84,7 +64,7 @@ export function emptyTables(desk) {
 
 export function assign(desk, table, item) {
   desk.assign[table] = item.key;
-  desk.history.push({ key: item.key, ids: [item.info.p1, item.info.p2] });
+  desk.history.push({ key: item.key, ids: [...item.ids] });
   if (desk.history.length > 300) desk.history.splice(0, desk.history.length - 300);
   desk.pins = desk.pins.filter((k) => k !== item.key);
 }
@@ -118,10 +98,10 @@ export function syncDesk(desk, infos) {
   const freed = [];
   for (const [n, key] of Object.entries(desk.assign)) {
     const it = infos.get(key);
-    if (!it || it.info.state === 'done' || it.info.state === 'bye') { delete desk.assign[n]; freed.push(Number(n)); }
+    if (!it || it.done) { delete desk.assign[n]; freed.push(Number(n)); }
   }
   for (const n of Object.keys(desk.assign)) if (Number(n) > desk.tables) delete desk.assign[n];
-  desk.pins = desk.pins.filter((k) => infos.has(k) && playable(infos.get(k)));
+  desk.pins = desk.pins.filter((k) => infos.has(k) && infos.get(k).playable);
   return freed;
 }
 
@@ -133,7 +113,9 @@ export function renderDesk(desk, infos, ctx) {
   const queue = buildQueue(desk, infos);
   const empties = emptyTables(desk);
   const shown = queue.filter((q) => desk.filter === 'all' || q.div === desk.filter);
-  const vs = (it) => `<span class="dk-p">${ctx.avatarOf(ctx.playerById(it.info.p1), 'xs')}<b>${esc(ctx.nameOf(it.info.p1))}</b></span><i>vs</i><span class="dk-p">${ctx.avatarOf(ctx.playerById(it.info.p2), 'xs')}<b>${esc(ctx.nameOf(it.info.p2))}</b></span>`;
+  const vs = (it) => ctx.vsHtml(it);
+  const multi = Object.keys(ctx.divisions).length > 1;
+  const who = ctx.who || '選手';
 
   const tableCard = (n) => {
     const key = desk.assign[n];
@@ -144,7 +126,7 @@ export function renderDesk(desk, infos, ctx) {
         <button type="button" class="btn small primary" data-action="desk-fill-one" data-table="${n}" ${queue.some((q) => !q.blocked) ? '' : 'disabled'}>排入建議場次</button></div>`;
     }
     const score = ctx.scoreOf(it);
-    return `<div class="dk-table busy t${n}"><div class="dk-th"><b>${n} 號桌</b><span class="dk-tag ${it.div}">${esc(ctx.divisionLabel(it.div))}</span></div>
+    return `<div class="dk-table busy t${n}"><div class="dk-th"><b>${n} 號桌</b>${multi ? `<span class="dk-tag ${it.div}">${esc(ctx.divisionLabel(it.div))}</span>` : ''}</div>
       <p class="dk-lab">${esc(ctx.labelOf(it))}</p>
       <div class="dk-vs">${vs(it)}</div>
       ${score ? `<p class="dk-score">目前 ${esc(score)}</p>` : ''}
@@ -159,13 +141,13 @@ export function renderDesk(desk, infos, ctx) {
 
   const chip = (value, label) => `<button type="button" class="${desk.filter === value ? 'on' : ''}" data-action="desk-filter" data-value="${value}">${esc(label)}</button>`;
   const restNote = (q) => {
-    if (q.blocked) return '<span class="dk-rest wait">選手比賽中</span>';
+    if (q.blocked) return `<span class="dk-rest wait">${who}比賽中</span>`;
     if (q.ok) return `<span class="dk-rest ok">${q.gap >= 999 ? '尚未出賽' : `休息 ${q.gap} 場`}</span>`;
     return `<span class="dk-rest warn">⚠ ${q.tired.map((id) => esc(ctx.nameOf(id))).join('、')} 剛打完</span>`;
   };
   const row = (q, i) => `<li class="dk-item ${q.blocked ? 'blocked' : ''} ${q.pinned ? 'pinned' : ''}">
       <span class="dk-no">${i + 1}</span>
-      <div class="dk-body"><div class="dk-meta"><span class="dk-tag ${q.div}">${esc(ctx.divisionLabel(q.div))}</span> ${esc(ctx.labelOf(q))} ${restNote(q)}</div>
+      <div class="dk-body"><div class="dk-meta">${multi ? `<span class="dk-tag ${q.div}">${esc(ctx.divisionLabel(q.div))}</span> ` : ''}${esc(ctx.labelOf(q))} ${restNote(q)}</div>
         <div class="dk-vs">${vs(q)}</div></div>
       <div class="dk-go">
         <button type="button" class="icon-btn ${q.pinned ? 'on' : ''}" data-action="desk-pin" data-key="${esc(q.key)}" title="${q.pinned ? '取消優先' : '設為優先（排到最前面）'}" aria-label="優先">📌</button>
@@ -176,7 +158,7 @@ export function renderDesk(desk, infos, ctx) {
     <section class="card dk-controls">
       <div class="dk-ctl-row">
         <label>球桌數<select data-change="desk-set" data-field="tables">${[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}" ${desk.tables === n ? 'selected' : ''}>${n} 張</option>`).join('')}</select></label>
-        <label>選手休息<select data-change="desk-set" data-field="rest">
+        <label>${who}休息<select data-change="desk-set" data-field="rest">
           <option value="0" ${desk.rest === 0 ? 'selected' : ''}>不限制</option>
           <option value="1" ${desk.rest === 1 ? 'selected' : ''}>至少隔 1 輪</option>
           <option value="2" ${desk.rest === 2 ? 'selected' : ''}>至少隔 2 輪</option></select></label>
@@ -186,14 +168,14 @@ export function renderDesk(desk, infos, ctx) {
           <button type="button" class="btn" data-action="desk-reset">重設桌況</button>
         </div>
       </div>
-      <p class="note">系統會優先排「休息最久、輪次最前面」的場次，並避開正在比賽的選手；標「⚠ 剛打完」的場次表示沒有更適合的選擇，要不要上桌由你決定，也可以按 📌 優先、或自己點「N 號桌」指定。</p>
+      <p class="note">系統會優先排「休息最久、輪次最前面」的場次，並避開正在比賽的${who}；標「⚠ 剛打完」的場次表示沒有更適合的選擇，要不要上桌由你決定，也可以按 📌 優先、或自己點「N 號桌」指定。</p>
     </section>
     <div class="dk-layout">
       <section class="card dk-planbox"><h3>球桌</h3>${plan}</section>
       <section class="card dk-queue">
         <div class="dk-qhead"><h3>待賽清單 <small>${shown.length} 場</small></h3>
-          <div class="hub-filter dk-filter">${chip('all', '全部')}${Object.keys(ctx.divisions).map((d) => chip(d, ctx.divisionLabel(d))).join('')}</div></div>
-        ${shown.length ? `<ol class="dk-list">${shown.map(row).join('')}</ol>` : '<p class="note">目前沒有可以開打的場次。預賽打完並產生總決賽後，總決賽的場次會出現在這裡。</p>'}
+          ${multi ? `<div class="hub-filter dk-filter">${chip('all', '全部')}${Object.keys(ctx.divisions).map((d) => chip(d, ctx.divisionLabel(d))).join('')}</div>` : ''}</div>
+        ${shown.length ? `<ol class="dk-list">${shown.map(row).join('')}</ol>` : '<p class="note">目前沒有可以開打的場次。</p>'}
       </section>
     </div>`;
 }

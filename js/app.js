@@ -7,7 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js?v=20261029u';
 import { exportExcel, lineReport } from './export.js';
-import { loadDesk, collectInfos, syncDesk, fillTables, assign as deskAssign, release as deskRelease, renderDesk, keyOf } from './desk.js?v=20261103b';
+import { loadDesk, syncDesk, fillTables, assign as deskAssign, release as deskRelease, renderDesk } from './desk.js?v=20261103d';
 import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog, staleSaved, staleNoteHtml } from './people.js?v=20261030i';
 
 const demo = new URLSearchParams(location.search).has('demo');
@@ -823,8 +823,27 @@ function renderAdmin() {
 
 // ---------------------------------------------------------------- 記分台（球桌場地圖＋待賽清單）
 
-const deskViews = () => Object.fromEntries(Object.keys(DIVISIONS).map((d) => [d, divisionView(d)]));
-const deskInfos = () => collectInfos(deskViews());
+// 把兩個組別所有的對戰整理成記分台的「項目」
+const deskInfos = () => {
+  const map = new Map();
+  for (const div of Object.keys(DIVISIONS)) {
+    const v = divisionView(div);
+    for (const [stage, res] of [['main', v.res], ['group', v.groupRes], ['final', v.finalRes]]) {
+      if (!res) continue;
+      for (const [code, info] of res) {
+        const key = `${div}|${stage}|${code}`;
+        map.set(key, {
+          key, div, stage, code, info, round: info.match?.round ?? 1,
+          ids: [info.p1, info.p2].filter(Boolean),
+          playable: (info.state === 'ready' || info.state === 'live') && !!info.p1 && !!info.p2,
+          done: info.state === 'done' || info.state === 'bye',
+        });
+      }
+    }
+  }
+  return map;
+};
+const deskVs = (it) => [it.info.p1, it.info.p2].map((id) => `<span class="dk-p">${avatar(playerById(id), 'xs')}<b>${esc(nameOf(id))}</b></span>`).join('<i>vs</i>');
 function deskLabel(it) {
   const v = divisionView(it.div);
   const m = it.info.match;
@@ -842,10 +861,10 @@ function renderDeskView() {
   if (!isOrganizer()) return renderAdminLogin();
   const infos = deskInfos();
   const freed = syncDesk(desk, infos);
-  if (freed.length && desk.auto) fillTables(desk, infos, freed);
+  if (freed.length && desk.auto) fillTables(desk, infos);
   if (freed.length) saveDesk();
   return renderDesk(desk, infos, {
-    esc, nameOf, avatarOf: avatar, playerById, divisions: DIVISIONS,
+    esc, nameOf, vsHtml: deskVs, divisions: DIVISIONS,
     divisionLabel: (d) => DIVISIONS[d], labelOf: deskLabel, scoreOf: deskScore,
   });
 }
