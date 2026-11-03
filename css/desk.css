@@ -1,0 +1,86 @@
+/* 記分台：球桌場地圖 ＋ 待賽清單 */
+.viewtabs.four { grid-template-columns: repeat(4, 1fr); }
+@media (min-width: 960px) { .viewtabs.four { grid-template-columns: repeat(4, auto); justify-content: start; gap: 8px; padding: 0 0 16px; } }
+
+main.container.view-desk { display: block; }
+.dk-controls .dk-ctl-row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: end; }
+.dk-controls label { display: grid; gap: 4px; font-weight: 700; font-size: 14px; }
+.dk-controls select { min-height: 40px; }
+.dk-check { display: flex !important; align-items: center; gap: 8px !important; font-weight: 600 !important; min-height: 40px; }
+.dk-check input { width: 20px; height: 20px; }
+.dk-ctl-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+.dk-layout { display: grid; gap: 14px; margin-top: 14px; align-items: start; }
+@media (min-width: 960px) {
+  main.container.view-desk { width: min(1320px, 100% - 48px); }
+  .dk-layout { grid-template-columns: minmax(0, 1.25fr) minmax(360px, 1fr); }
+  .dk-queue { position: sticky; top: 96px; max-height: calc(100vh - 120px); overflow-y: auto; }
+}
+
+/* 場地圖：照實際球桌位置排（5 張桌：1、2、3 號在左邊，5、4 號在右邊，左上角是兒童閱覽室） */
+.dk-plan { display: grid; gap: 10px; }
+.dk-plan.planN { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.dk-plan.plan5 {
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  grid-template-areas: "room t5" "t1 t5" "t2 t4" "t3 t4";
+  grid-auto-rows: minmax(auto, 1fr);
+}
+.dk-room { grid-area: room; display: grid; place-items: center; min-height: 64px; border-radius: 14px; background: #dfe9f4; color: #1f4f8a; font-weight: 800; letter-spacing: .1em; }
+.plan5 .t1 { grid-area: t1; } .plan5 .t2 { grid-area: t2; } .plan5 .t3 { grid-area: t3; }
+.plan5 .t4 { grid-area: t4; } .plan5 .t5 { grid-area: t5; }
+@media (max-width: 640px) {
+  .dk-plan.plan5 { grid-template-columns: 1fr; grid-template-areas: "room" "t1" "t2" "t3" "t4" "t5"; }
+}
+
+.dk-table { display: grid; gap: 6px; align-content: start; padding: 12px; border-radius: 16px; border: 2px solid #c5d5e6; background: #fff; }
+.dk-table.busy { border-color: #3071B9; background: #f3f8fe; }
+.dk-table.empty { border-style: dashed; background: #fafcfe; }
+.dk-th { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dk-th b { font-size: 17px; }
+.dk-tag { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #e3edf8; color: #1f4f8a; }
+.dk-tag.fun { background: #ffeb99; color: #5c4800; }
+.dk-tag.idle { background: #e6ece2; color: #46613a; }
+.dk-lab { margin: 0; font-size: 13px; color: var(--sub, #666464); font-weight: 700; }
+.dk-empty { margin: 0; color: var(--sub, #666464); font-size: 14px; }
+.dk-vs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dk-vs i { font-style: normal; font-size: 12px; color: var(--sub, #666464); }
+.dk-p { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; }
+.dk-score { margin: 0; font-weight: 800; color: #1f4f8a; }
+.dk-act { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+
+.dk-qhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.dk-qhead h3 { margin: 0; }
+.dk-qhead small { font-weight: 600; color: var(--sub, #666464); margin-left: 4px; }
+.dk-filter { display: flex; gap: 6px; }
+.dk-filter button { min-height: 34px; padding: 0 12px; border: 1.5px solid #c5d5e6; border-radius: 999px; background: #fff; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; }
+.dk-filter button.on { background: #3071B9; border-color: #3071B9; color: #fff; }
+.dk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.dk-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 10px; border-radius: 14px; background: #f3f7fb; }
+.dk-item.pinned { background: #fff4bf; }
+.dk-item.blocked { opacity: .55; }
+.dk-no { font-weight: 800; color: var(--sub, #666464); text-align: center; }
+.dk-meta { font-size: 13px; color: var(--sub, #666464); font-weight: 700; margin-bottom: 3px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dk-rest { padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.dk-rest.ok { background: #dff3e4; color: #1d6b34; }
+.dk-rest.warn { background: #ffe1dd; color: #a02a1d; }
+.dk-rest.wait { background: #e8e8e8; color: #555; }
+.dk-go { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.dk-go .icon-btn.on { background: #ffd23f; }
+@media (max-width: 520px) { .dk-item { grid-template-columns: 24px minmax(0, 1fr); } .dk-go { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* 筆電（螢幕較矮）：場地圖與清單壓縮，一個畫面看到所有球桌 */
+@media (min-width: 960px) {
+  main.container.view-desk { padding-top: 12px; }
+  .dk-controls { padding: 10px 14px; }
+  .dk-controls .note { margin: 6px 0 0; font-size: 12px; }
+  .dk-layout { margin-top: 10px; gap: 12px; }
+  .dk-planbox, .dk-queue { padding: 12px 14px; }
+  .dk-planbox h3, .dk-qhead h3 { font-size: 16px; margin-bottom: 6px; }
+  .dk-plan { gap: 8px; }
+  .dk-room { min-height: 40px; font-size: 14px; }
+  .dk-table { padding: 8px 10px; gap: 4px; border-radius: 12px; }
+  .dk-th b { font-size: 15px; }
+  .dk-p { font-size: 15px; }
+  .dk-act .btn, .dk-table > .btn { min-height: 32px; padding: 2px 12px; }
+  .dk-item { padding: 8px 10px; }
+}

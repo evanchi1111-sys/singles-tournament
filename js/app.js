@@ -7,6 +7,7 @@ import {
   resolveStage, dependentsOf, standings, resultsFrom, roundLabel, knockoutPlacings,
 } from './bracket.js?v=20261029u';
 import { exportExcel, lineReport } from './export.js';
+import { loadDesk, collectInfos, syncDesk, fillTables, assign as deskAssign, release as deskRelease, renderDesk, keyOf } from './desk.js?v=20261103b';
 import { avatar as avatarOf, titleChip as titleChipOf, openPeoplePicker, resultsHtml, PLACE_LABEL, openSaveResultsDialog, staleSaved, staleNoteHtml } from './people.js?v=20261030i';
 
 const demo = new URLSearchParams(location.search).has('demo');
@@ -26,11 +27,14 @@ const state = {
   results: {}, // 選手歷年成績（冠、亞、季軍）：{ 姓名: [成績] }
   matches: [],
   user: null,
-  view: ['admin', 'players'].includes(store.get('view', 'results')) ? store.get('view') : 'results',
+  view: ['admin', 'players', 'desk'].includes(store.get('view', 'results')) ? store.get('view') : 'results',
   division: DIVISIONS[store.get('division')] ? store.get('division') : 'competitive',
   stageTab: store.get('stageTab', 'group'),
   me: store.get('me', ''),
 };
+
+const desk = loadDesk(store.get('desk', ''));
+const saveDesk = () => store.set('desk', JSON.stringify(desk));
 
 const app = document.getElementById('app');
 const modalRoot = document.getElementById('modal-root');
@@ -275,10 +279,11 @@ function renderHeader() {
         </div>
         <div class="who"><a class="hall-chip" href="${hallHref()}">🏆 英雄榜</a>${isOrganizer() ? `<button class="btn small" data-action="logout">登出主辦</button>` : ''}</div>
       </div>
-      <nav class="container viewtabs three" aria-label="功能">
+      <nav class="container viewtabs ${isOrganizer() ? 'four' : 'three'}" aria-label="功能">
         <button class="viewtab ${state.view === 'results' ? 'on' : ''}" data-action="view" data-view="results" aria-pressed="${state.view === 'results'}">賽程與成績</button>
         <button class="viewtab ${state.view === 'players' ? 'on' : ''}" data-action="view" data-view="players" aria-pressed="${state.view === 'players'}">參賽選手</button>
         <button class="viewtab ${state.view === 'admin' ? 'on' : ''}" data-action="view" data-view="admin" aria-pressed="${state.view === 'admin'}">主辦管理</button>
+        ${isOrganizer() ? `<button class="viewtab ${state.view === 'desk' ? 'on' : ''}" data-action="view" data-view="desk" aria-pressed="${state.view === 'desk'}">記分台</button>` : ''}
       </nav>
     </header>`;
 }
@@ -816,6 +821,35 @@ function renderAdmin() {
     </section>`;
 }
 
+// ---------------------------------------------------------------- 記分台（球桌場地圖＋待賽清單）
+
+const deskViews = () => Object.fromEntries(Object.keys(DIVISIONS).map((d) => [d, divisionView(d)]));
+const deskInfos = () => collectInfos(deskViews());
+function deskLabel(it) {
+  const v = divisionView(it.div);
+  const m = it.info.match;
+  if (it.stage === 'group') return v.cfg.format === 'roundrobin' ? `第 ${m.round} 輪` : `${m.grp} 組 第 ${m.round} 輪`;
+  if (it.stage === 'main') return roundLabel(m.code, v.size);
+  return /^S-/.test(m.code) ? `總決賽 第 ${m.round} 輪` : `總決賽 ${PLAYOFF_LABEL[m.code] || roundLabel(m.code, v.size)}`;
+}
+function deskScore(it) {
+  const m = it.info.match;
+  if (!m.games?.length) return '';
+  const o = matchOutcome(m.games, bestOfFor(state.divisions[it.div], it.stage));
+  return `${o.w1} : ${o.w2}`;
+}
+function renderDeskView() {
+  if (!isOrganizer()) return renderAdminLogin();
+  const infos = deskInfos();
+  const freed = syncDesk(desk, infos);
+  if (freed.length && desk.auto) fillTables(desk, infos, freed);
+  if (freed.length) saveDesk();
+  return renderDesk(desk, infos, {
+    esc, nameOf, avatarOf: avatar, playerById, divisions: DIVISIONS,
+    divisionLabel: (d) => DIVISIONS[d], labelOf: deskLabel, scoreOf: deskScore,
+  });
+}
+
 function render() {
   document.dispatchEvent(new CustomEvent('site-organizer', { detail: isOrganizer() })); // 只有主辦看得到共用導覽列
   if (!state.loaded) {
@@ -830,7 +864,7 @@ function render() {
     <main class="container view-${state.view}">
       ${state.error ? `<div class="banner error">⚠️ 與資料庫連線異常：${esc(state.error)}（畫面可能不是最新）</div>` : ''}
       ${demo ? `<div class="banner demo">🧪 示範模式：資料只存在這個分頁，重新整理就會還原。</div>` : ''}
-      ${state.view === 'admin' ? renderAdmin() : state.view === 'players' ? renderPlayers()
+      ${state.view === 'admin' ? renderAdmin() : state.view === 'desk' ? renderDeskView() : state.view === 'players' ? renderPlayers()
         : `${renderDivisionTabs()}${renderCompetition(divisionView(state.division), { admin: false })}`}
     </main>`;
 }
@@ -1159,6 +1193,49 @@ const actions = {
   'stage-tab': ({ tab }) => { state.stageTab = tab; store.set('stageTab', tab); render(); },
   logout: async () => { await backend.signOut(); toast('已登出'); },
   score: ({ stage, code }) => openScoreModal(state.division, stage, code),
+  'desk-score': ({ table }) => {
+    const it = deskInfos().get(desk.assign[table]);
+    if (it) openScoreModal(it.div, it.stage, it.code);
+  },
+  'desk-assign': ({ table, key }) => {
+    const infos = deskInfos();
+    const it = infos.get(key);
+    if (!it || desk.assign[table]) return;
+    deskAssign(desk, Number(table), it);
+    saveDesk();
+    render();
+  },
+  'desk-release': ({ table }) => {
+    deskRelease(desk, table, { undo: true });
+    saveDesk();
+    render();
+  },
+  'desk-fill': () => {
+    const { placed, tired } = fillTables(desk, deskInfos());
+    saveDesk();
+    render();
+    toast(placed ? `已排入 ${placed} 場${tired ? `（其中 ${tired} 場有選手剛打完）` : ''}` : '沒有可以排的場次');
+  },
+  'desk-fill-one': ({ table }) => {
+    const { placed, tired } = fillTables(desk, deskInfos(), [Number(table)]);
+    saveDesk();
+    render();
+    if (placed && tired) toast('這場有選手剛打完，沒有更適合的選擇');
+  },
+  'desk-pin': ({ key }) => {
+    desk.pins = desk.pins.includes(key) ? desk.pins.filter((k) => k !== key) : [...desk.pins, key];
+    saveDesk();
+    render();
+  },
+  'desk-filter': ({ value }) => { desk.filter = value; saveDesk(); render(); },
+  'desk-reset': () => {
+    if (!confirm('重設桌況會清空所有球桌與出賽紀錄（不會動到比分）。確定嗎？')) return;
+    desk.assign = {};
+    desk.history = [];
+    desk.pins = [];
+    saveDesk();
+    render();
+  },
   profile: ({ id }) => openProfileModal(id),
   move: ({ id, dir }) => {
     const list = playersOf(state.division);
@@ -1266,6 +1343,12 @@ app.addEventListener('change', (e) => {
   if (kind === 'me') {
     state.me = el.value;
     store.set('me', el.value);
+    render();
+  } else if (kind === 'desk-set') {
+    const field = el.dataset.field;
+    desk[field] = field === 'auto' ? el.checked : Number(el.value);
+    if (field === 'tables') for (const n of Object.keys(desk.assign)) if (Number(n) > desk.tables) delete desk.assign[n];
+    saveDesk();
     render();
   } else if (kind === 'div-setting') {
     const field = el.dataset.field;
