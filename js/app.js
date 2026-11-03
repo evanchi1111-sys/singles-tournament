@@ -1065,7 +1065,7 @@ function openProfileModal(id) {
       <div class="profile-hero">${avatar(p, 'big')}</div>
       <h2>${esc(p.name)}</h2>
       <p class="profile-unit">${esc(p.unit || '（未填單位）')}</p>
-      <p>${titleChip(p)} <span class="ttl plain">${DIVISIONS[p.division]}・${p.seed} 號種子</span></p>
+      <p>${titleChip(p)} <span class="ttl plain">${DIVISIONS[p.division]}</span></p>
       <div class="stats">
         <div><b>${rec.wins}</b><span>勝</span></div>
         <div><b>${rec.losses}</b><span>敗</span></div>
